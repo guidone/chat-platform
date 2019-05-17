@@ -1,0 +1,19 @@
+{
+  "name": "chat-platform",
+  "version": "1.0.0",
+  "description": "Universal Chat Platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cli-color": "^1.4.0",
+    "cli-table": "^0.3.1",
+    "moment": "^2.24.0",
+    "request": "^2.88.0",
+    "underscore": "^1.9.1",
+    "underscore.string": "^3.3.5"
+  }
+}
