@@ -1,5 +1,6 @@
-var _ = require('underscore');
-var _store = {};
+const _ = require('underscore');
+const _store = {};
+const _storeUserIds = {};
 
 function MemoryStore(defaults) {
   this._context = _.clone(defaults || {});
@@ -53,16 +54,29 @@ _.extend(MemoryStore.prototype, {
 
 function MemoryFactory() {
 
-  this.getOrCreate = function(chatId, defaults) {
-    var chatContext = this.get(chatId);
+  this.getOrCreate = function(chatId, userId, defaults) {
+    console.log('Get or create mem context', chatId, userId);
+    const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
-      _store[chatId] = new MemoryStore(defaults);
+      const memoryStore = new MemoryStore(defaults);
+      _store[chatId] = memoryStore;
+      if (!_.isEmpty(userId)) {
+        _storeUserIds[userId] = memoryStore;
+      }
+      console.log('created ', userId, chatId);
       return _store[chatId];
     }
     return chatContext;
   };
-  this.get = function(chatId) {
-    return _store[chatId];
+  this.get = function(chatId, userId) {
+    if (!_.isEmpty(chatId) && _store[chatId] != null) {
+      console.log('get mem context chatId', chatId);
+      return _store[chatId];
+    } else if (!_.isEmpty(userId) && _storeUserIds[userId] != null) {
+      console.log('get mem context userId', userId);
+      return _storeUserIds[userId];
+    }
+    return null;
   };
 
   return this;
@@ -71,9 +85,9 @@ _.extend(MemoryFactory.prototype, {
   name: 'Memory',
   description: 'Memory context provider, it\' fast and synchronous but it doesn\'t persists the values, once the'
     + ' server is restarted all contexts are lost. It doesn\'t requires any parameters. Good for testing.',
-  get: function(/*chatId*/) {
+  get: function(/*chatId, userId*/) {
   },
-  getOrCreate: function(/*chatId, defaults*/) {
+  getOrCreate: function(/*chatId, userId, defaults*/) {
   },
   stop: function() {
     return new Promise(function(resolve) {

@@ -1,30 +1,30 @@
-var _ = require('underscore');
-var _s = require('underscore.string');
-var clc = require('cli-color');
-var prettyjson = require('prettyjson');
-var utils = require('./helpers/utils');
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('util').inherits;
-var lcd = require('./helpers/lcd');
-var Table = require('cli-table');
-var request = require('request').defaults({ encoding: null });
+const _ = require('underscore');
+const _s = require('underscore.string');
+const clc = require('cli-color');
+const prettyjson = require('prettyjson');
+const utils = require('./helpers/utils');
+const EventEmitter = require('events').EventEmitter;
+const inherits = require('util').inherits;
+const lcd = require('./helpers/lcd');
+const Table = require('cli-table');
+const request = require('request').defaults({ encoding: null });
 
-var identity = function(obj) { return obj; };
-var when = utils.when;
-var green = clc.greenBright;
-var white = clc.white;
-var yellow = clc.yellow;
-var red = clc.red;
-var orange = clc.xterm(214);
-var grey = clc.blackBright;
+const identity = function(obj) { return obj; };
+const when = utils.when;
+const green = clc.greenBright;
+const white = clc.white;
+const yellow = clc.yellow;
+const red = clc.red;
+const orange = clc.xterm(214);
+const grey = clc.blackBright;
 
 var _messageTypes = [];
 var _events = [];
 var _platforms = {};
 
-var ChatExpress = function(options) {
+const ChatExpress = function(options) {
 
-  var _this = this;
+  const _this = this;
   this.options = _.extend({
     contextProvider: null,
     connector: null,
@@ -150,7 +150,7 @@ var ChatExpress = function(options) {
     var onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
 
-    return when(contextProvider.getOrCreate(chatId, {
+    return when(contextProvider.getOrCreate(chatId, userId, {
         chatId: chatId,
         userId: userId,
         messageId: messageId,
@@ -160,7 +160,7 @@ var ChatExpress = function(options) {
         language: null
       })
     ).then(function() {
-      var message = _.extend({}, inboudMessage, {
+      const message = _.extend({}, inboudMessage, {
         originalMessage: {
           chatId: chatId,
           userId: userId,
@@ -168,13 +168,13 @@ var ChatExpress = function(options) {
           transport: options.transport,
           language: null
         },
-        chat: function() {
-          return contextProvider.get(chatId);
+        chat() {
+          return contextProvider.get(chatId, userId);
         },
-        api: function() {
+        api() {
           return chatServer;
         },
-        client: function() {
+        client() {
           return options.connector;
         }
       });
@@ -386,9 +386,41 @@ var ChatExpress = function(options) {
     }
 
     // create empty promise
-    var stack = new Promise(function(resolve) {
+    let stack = new Promise(function(resolve) {
       resolve(message);
     });
+    // check for chatId, if not present check for userId-chatId translator, otherwise fail
+    stack = stack.then(message => {
+
+
+      const callbacks = chatServer.getCallbacks();
+
+      if (!_.isEmpty(message.payload.chatId)) {
+        return message;
+      } else if (_.isFunction(callbacks.getChatIdFromUserId) && !_.isEmpty(message.originalMessage.userId)) {
+        console.log('calling getChatIdFromUserId....', message.originalMessage.userId);
+
+        console.log('code:', callbacks.getChatIdFromUserId);
+        return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId))
+          .then(chatId => {
+            console.log('obtained chatId', chatId);
+            if (_.isEmpty(chatId)) {
+              throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
+            } else {
+              message.payload.chatId = chatId;
+              return message;
+            }
+          });
+
+      } else {
+        throw new Error('Incoming message has empty chatId and no chatId - userId resolved has been provided');
+      }
+
+      return message;
+    });
+
+
+
     // run general middleware
     _(_this.uses.concat(chatServer.getUseMiddleWares())).each(function(filter) {
       stack = stack.then(function(message) {
@@ -850,6 +882,12 @@ var ChatExpress = function(options) {
         };
         this.onMessageId = function(callback) {
           _callbacks.messageId = callback;
+        };
+        this.onGetChatIdFromUserId = function(callback) {
+          _callbacks.getChatIdFromUserId = callback;
+        };
+        this.onGetUserIdFromChatId = function(callback) {
+          _callbacks.getUserIdFromChatId = callback;
         };
         this.getCallbacks = function() {
           return _callbacks;
