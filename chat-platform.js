@@ -364,7 +364,7 @@ const ChatExpress = function(options) {
 
   function outboundMessage(message, chatServer) {
 
-    var instanceOptions = chatServer.getOptions();
+    const instanceOptions = chatServer.getOptions();
     // check if the message is from the right platform (in static class or instance)
     if (message.originalMessage != null && message.originalMessage.transport !== _this.options.transport &&
       message.originalMessage.transport !== instanceOptions.transport) {
@@ -391,7 +391,7 @@ const ChatExpress = function(options) {
     });
     // check for chatId, if not present check for userId-chatId translator, otherwise fail
     stack = stack.then(message => {
-
+      const { transport } = instanceOptions;
 
       const callbacks = chatServer.getCallbacks();
 
@@ -401,7 +401,7 @@ const ChatExpress = function(options) {
         console.log('calling getChatIdFromUserId....', message.originalMessage.userId);
 
         console.log('code:', callbacks.getChatIdFromUserId);
-        return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId))
+        return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport))
           .then(chatId => {
             console.log('obtained chatId', chatId);
             if (_.isEmpty(chatId)) {
@@ -418,9 +418,6 @@ const ChatExpress = function(options) {
 
       return message;
     });
-
-
-
     // run general middleware
     _(_this.uses.concat(chatServer.getUseMiddleWares())).each(function(filter) {
       stack = stack.then(function(message) {
@@ -684,11 +681,14 @@ const ChatExpress = function(options) {
           console.log(red(text));
           this.emit('error', text);
         };
-        this.request = function(options) {
+        this.log = function(obj) {
+          console.log(prettyjson.render(obj));
+        };
+        this.request = function(options = {}) {
           return new Promise(function(resolve, reject) {
             request(options, function(error, response, body) {
               if (error) {
-                reject('Error downloading file ' + options.url);
+                reject(`Error calling URL ${options.url}`);
               } else {
                 resolve(body);
               }
