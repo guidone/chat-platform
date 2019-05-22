@@ -145,9 +145,9 @@ const ChatExpress = function(options) {
   // eslint-disable-next-line max-params
   function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
 
-    var options = chatServer.getOptions();
-    var contextProvider = options.contextProvider;
-    var onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
+    const options = chatServer.getOptions();
+    const contextProvider = options.contextProvider;
+    const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
 
     return when(contextProvider.getOrCreate(chatId, userId, {
@@ -173,6 +173,10 @@ const ChatExpress = function(options) {
         },
         api() {
           return chatServer;
+        },
+        isTransportAvailable(transport) {
+          console.log('first isTransportAvailable', userId, transport);
+          return chatServer.isTransportAvailable(userId, transport);
         },
         client() {
           return options.connector;
@@ -206,7 +210,7 @@ const ChatExpress = function(options) {
       return;
     }
     // create the node red message structure
-    var message = {
+    const message = {
       originalMessage: _.extend({}, payload, {
         chatId: parsedMessage.chatId,
         userId: parsedMessage.userId,
@@ -224,7 +228,7 @@ const ChatExpress = function(options) {
         inbound: true
       },
       chat: function() {
-        return contextProvider.get(parsedMessage.chatId);
+        return contextProvider.get(parsedMessage.chatId, parsedMessage.userId);
       },
       api: function() {
         return chatServer;
@@ -234,14 +238,14 @@ const ChatExpress = function(options) {
       }
     };
     // create empty promise
-    var stack = new Promise(function(resolve) {
+    let stack = new Promise(function(resolve) {
       resolve(message);
     });
     // if any context provider, then create the context
     if (contextProvider != null) {
       stack = stack
         .then(function() {
-          return when(contextProvider.getOrCreate(parsedMessage.chatId, {
+          return when(contextProvider.getOrCreate(parsedMessage.chatId, parsedMessage.userId, {
             chatId: parsedMessage.chatId,
             userId: parsedMessage.userId,
             transport: parsedMessage.transport,
@@ -885,6 +889,16 @@ const ChatExpress = function(options) {
         };
         this.onGetChatIdFromUserId = function(callback) {
           _callbacks.getChatIdFromUserId = callback;
+        };
+        this.isTransportAvailable = function(userId, transport) {
+          if (!_.isFunction(_callbacks.getChatIdFromUserId)) {
+            throw new Error('Resolver chatId<->userId not defined');
+          }
+          return when(_callbacks.getChatIdFromUserId.call(chatServer, userId, transport))
+            .then(chatId => {
+              console.log('trovato?', chatId, chatId != null);
+              return chatId != null
+            });
         };
         this.onGetUserIdFromChatId = function(callback) {
           _callbacks.getUserIdFromChatId = callback;
