@@ -108,7 +108,7 @@ const ChatExpress = function(options) {
         payload[callbackName] = callbacks[callbackName].call(chatServer, payload)
       }
     });
-
+    console.log('sto per ricevere', payload);
     // at this point should have at least the values chatId and type
     if (payload.chatId == null && !options.relaxChatId) {
       throw 'Error: inbound message key "chatId" for transport ' + _this.options.transport + ' is empty\n\n'
@@ -896,7 +896,6 @@ const ChatExpress = function(options) {
           }
           return when(_callbacks.getChatIdFromUserId.call(chatServer, userId, transport))
             .then(chatId => {
-              console.log('trovato?', chatId, chatId != null);
               return chatId != null
             });
         };
