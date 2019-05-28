@@ -146,6 +146,7 @@ const ChatExpress = function(options) {
   function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
 
     const options = chatServer.getOptions();
+
     const contextProvider = options.contextProvider;
     const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
@@ -370,7 +371,7 @@ const ChatExpress = function(options) {
 
     const instanceOptions = chatServer.getOptions();
     // check if the message is from the right platform (in static class or instance)
-    if (message.originalMessage != null && message.originalMessage.transport !== _this.options.transport &&
+    /*if (message.originalMessage != null && message.originalMessage.transport !== _this.options.transport &&
       message.originalMessage.transport !== instanceOptions.transport) {
       // exit, it's not from the current platform
       if (chatServer.isDebug()) {
@@ -378,7 +379,7 @@ const ChatExpress = function(options) {
         console.log(yellow('Skipped incoming message for platform: ' + message.originalMessage.transport));
       }
       return;
-    }
+    }*/
 
     if (chatServer.isDebug()) {
       // eslint-disable-next-line no-console
@@ -403,8 +404,6 @@ const ChatExpress = function(options) {
         return message;
       } else if (_.isFunction(callbacks.getChatIdFromUserId) && !_.isEmpty(message.originalMessage.userId)) {
         console.log('calling getChatIdFromUserId....', message.originalMessage.userId);
-
-        console.log('code:', callbacks.getChatIdFromUserId);
         return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport))
           .then(chatId => {
             console.log('obtained chatId', chatId);
