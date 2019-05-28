@@ -55,7 +55,9 @@ _.extend(MemoryStore.prototype, {
 function MemoryFactory() {
 
   this.getOrCreate = function(chatId, userId, defaults) {
-    console.log('Get or create mem context', chatId, userId);
+    if (_.isEmpty(chatId) && _.isEmpty(userId)) {
+      return null;
+    }
     const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
       const memoryStore = new MemoryStore(defaults);
@@ -63,17 +65,14 @@ function MemoryFactory() {
       if (!_.isEmpty(userId)) {
         _storeUserIds[userId] = memoryStore;
       }
-      console.log('created ', userId, chatId);
       return _store[chatId];
     }
     return chatContext;
   };
   this.get = function(chatId, userId) {
     if (!_.isEmpty(chatId) && _store[chatId] != null) {
-      console.log('get mem context chatId', chatId);
       return _store[chatId];
     } else if (!_.isEmpty(userId) && _storeUserIds[userId] != null) {
-      console.log('get mem context userId', userId);
       return _storeUserIds[userId];
     }
     return null;
