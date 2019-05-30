@@ -398,21 +398,26 @@ const ChatExpress = function(options) {
       const { transport } = instanceOptions;
 
       const callbacks = chatServer.getCallbacks();
-
       if (!_.isEmpty(message.payload.chatId)) {
         return message;
-      } else if (_.isFunction(callbacks.getChatIdFromUserId) && !_.isEmpty(message.originalMessage.userId)) {
+      } else if (_.isFunction(callbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
         console.log('calling getChatIdFromUserId....', message.originalMessage.userId);
-        return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport))
-          .then(chatId => {
-            console.log('obtained chatId', chatId);
-            if (_.isEmpty(chatId)) {
-              throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
-            } else {
-              message.payload.chatId = chatId;
-              return message;
-            }
-          });
+        try {
+          return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport))
+            .then(chatId => {
+              console.log('obtained chatId', chatId);
+              if (_.isEmpty(chatId)) {
+                throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
+              } else {
+                message.payload.chatId = chatId;
+                return message;
+              }
+            });
+        } catch(e) {
+          // todo better error displaying
+          console.log('Error in resolver chatId<->userId', e);
+          throw new Error('Error in resolver chatId<->userId', e);
+        }
 
       } else {
         // raise error only if not relaxChatId
@@ -895,10 +900,16 @@ const ChatExpress = function(options) {
           if (!_.isFunction(_callbacks.getChatIdFromUserId)) {
             throw new Error('Resolver chatId<->userId not defined');
           }
-          return when(_callbacks.getChatIdFromUserId.call(chatServer, userId, transport))
-            .then(chatId => {
-              return chatId != null
-            });
+          try {
+            return when(_callbacks.getChatIdFromUserId.call(chatServer, userId, transport))
+              .then(chatId => {
+                return chatId != null
+              });
+          } catch(e) {
+            // todo better error displaying
+            console.log('Error in resolver chatId<->userId', e);
+            throw new Error('Error in resolver chatId<->userId', e);
+          }
         };
         this.onGetUserIdFromChatId = function(callback) {
           _callbacks.getUserIdFromChatId = callback;
