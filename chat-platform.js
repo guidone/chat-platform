@@ -21,6 +21,7 @@ const grey = clc.blackBright;
 var _messageTypes = [];
 var _events = [];
 var _platforms = {};
+var _globalCallbacks = {};
 
 const ChatExpress = function(options) {
 
@@ -174,9 +175,13 @@ const ChatExpress = function(options) {
         api() {
           return chatServer;
         },
-        isTransportAvailable(transport) {
-          console.log('first isTransportAvailable', userId, transport);
-          return chatServer.isTransportAvailable(userId, transport);
+        isTransportAvailable(transport, message) {
+          console.log('msg() isTransportAvailable', userId, transport, message != null);
+          return chatServer.isTransportAvailable(userId, transport, message);
+        },
+        getPreferredTransport(transport, message) {
+          console.log('msg() getPreferredTransport', userId, transport, message != null);
+          return chatServer.getPreferredTransport(userId, transport, message);
         },
         client() {
           return options.connector;
@@ -400,10 +405,10 @@ const ChatExpress = function(options) {
       const callbacks = chatServer.getCallbacks();
       if (!_.isEmpty(message.payload.chatId)) {
         return message;
-      } else if (_.isFunction(callbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
-        console.log('calling getChatIdFromUserId....', message.originalMessage.userId);
+      } else if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
+        console.log('calling getChatIdFromUserId....', message.originalMessage.userId, message != null);
         try {
-          return when(callbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport))
+          return when(_globalCallbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport, message))
             .then(chatId => {
               console.log('obtained chatId', chatId);
               if (_.isEmpty(chatId)) {
@@ -894,14 +899,14 @@ const ChatExpress = function(options) {
           _callbacks.messageId = callback;
         };
         this.onGetChatIdFromUserId = function(callback) {
-          _callbacks.getChatIdFromUserId = callback;
+          _globalCallbacks.getChatIdFromUserId = callback;
         };
-        this.isTransportAvailable = function(userId, transport) {
-          if (!_.isFunction(_callbacks.getChatIdFromUserId)) {
+        this.isTransportAvailable = function(userId, transport, message) {
+          if (!_.isFunction(_globalCallbacks.getChatIdFromUserId)) {
             throw new Error('Resolver chatId<->userId not defined');
           }
           try {
-            return when(_callbacks.getChatIdFromUserId.call(chatServer, userId, transport))
+            return when(_globalCallbacks.getChatIdFromUserId.call(chatServer, userId, transport, message))
               .then(chatId => {
                 return chatId != null
               });
