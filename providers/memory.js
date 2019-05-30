@@ -2,6 +2,8 @@ const _ = require('underscore');
 const _store = {};
 const _storeUserIds = {};
 
+const isEmpty = value => _.isEmpty(value) && value != null;
+
 function MemoryStore(defaults) {
   this._context = _.clone(defaults || {});
   return this;
@@ -55,14 +57,14 @@ _.extend(MemoryStore.prototype, {
 function MemoryFactory() {
 
   this.getOrCreate = function(chatId, userId, defaults) {
-    if (_.isEmpty(chatId) && _.isEmpty(userId)) {
+    if (isEmpty(chatId) && isEmpty(userId)) {
       return null;
     }
     const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
       const memoryStore = new MemoryStore(defaults);
       _store[chatId] = memoryStore;
-      if (!_.isEmpty(userId)) {
+      if (!isEmpty(userId)) {
         _storeUserIds[userId] = memoryStore;
       }
       return _store[chatId];
@@ -70,9 +72,9 @@ function MemoryFactory() {
     return chatContext;
   };
   this.get = function(chatId, userId) {
-    if (!_.isEmpty(chatId) && _store[chatId] != null) {
+    if (!isEmpty(chatId) && _store[chatId] != null) {
       return _store[chatId];
-    } else if (!_.isEmpty(userId) && _storeUserIds[userId] != null) {
+    } else if (!isEmpty(userId) && _storeUserIds[userId] != null) {
       return _storeUserIds[userId];
     }
     return null;
