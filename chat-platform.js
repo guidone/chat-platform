@@ -176,12 +176,10 @@ const ChatExpress = function(options) {
           return chatServer;
         },
         isTransportAvailable(transport, message) {
-          console.log('msg() isTransportAvailable', userId, transport, message != null);
           return chatServer.isTransportAvailable(userId, transport, message);
         },
-        getPreferredTransport(transport, message) {
-          console.log('msg() getPreferredTransport', userId, transport, message != null);
-          return chatServer.getPreferredTransport(userId, transport, message);
+        isTransportPreferred(transport, message) {
+          return chatServer.isTransportPreferred(userId, transport, message);
         },
         client() {
           return options.connector;
@@ -402,7 +400,6 @@ const ChatExpress = function(options) {
     stack = stack.then(message => {
       const { transport } = instanceOptions;
 
-      const callbacks = chatServer.getCallbacks();
       if (!_.isEmpty(message.payload.chatId)) {
         return message;
       } else if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
@@ -901,6 +898,9 @@ const ChatExpress = function(options) {
         this.onGetChatIdFromUserId = function(callback) {
           _globalCallbacks.getChatIdFromUserId = callback;
         };
+        this.onGetPreferredTransport = function(callback) {
+          _globalCallbacks.onGetPreferredTransport = callback;
+        };
         this.isTransportAvailable = function(userId, transport, message) {
           if (!_.isFunction(_globalCallbacks.getChatIdFromUserId)) {
             throw new Error('Resolver chatId<->userId not defined');
@@ -914,6 +914,21 @@ const ChatExpress = function(options) {
             // todo better error displaying
             console.log('Error in resolver chatId<->userId', e);
             throw new Error('Error in resolver chatId<->userId', e);
+          }
+        };
+        this.isTransportPreferred = function(userId, message) {
+          if (!_.isFunction(_globalCallbacks.onGetPreferredTransport)) {
+            throw new Error('Resolver userId<->preferred transport not defined');
+          }
+          try {
+            return when(_globalCallbacks.onGetPreferredTransport.call(chatServer, userId, message))
+              .then(preferredTransport => {
+                return preferredTransport === transport;
+              });
+          } catch(e) {
+            // todo better error displaying
+            console.log('Error in resolver chatId<->preferred transport', e);
+            throw new Error('Error in resolver chatId<->preferred transport', e);
           }
         };
         this.onGetUserIdFromChatId = function(callback) {

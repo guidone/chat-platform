@@ -4,7 +4,9 @@
   "description": "Universal Chat Platform",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\""
+    "test": "jest",
+    "test-ci": "jest --watch",
+    "lint": "eslint ./*.js ./helpers/*.js"
   },
   "author": "",
   "license": "ISC",
@@ -17,5 +19,11 @@
     "request": "^2.88.0",
     "underscore": "^1.9.1",
     "underscore.string": "^3.3.5"
+  },
+  "devDependencies": {
+    "chai": "^4.1.1",
+    "chai-spies": "^1.0.0",
+    "eslint": "^4.12.1",
+    "jest": "^22.0.6"
   }
 }
