@@ -2,7 +2,7 @@ const _ = require('underscore');
 const _store = {};
 const _storeUserIds = {};
 
-const isEmpty = value => _.isEmpty(value) && value != null;
+const isEmpty = value => value == null || value === '';
 
 function MemoryStore(defaults) {
   this._context = _.clone(defaults || {});

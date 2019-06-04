@@ -2,7 +2,7 @@ const _ = require('underscore');
 const _s = require('underscore.string');
 const clc = require('cli-color');
 const prettyjson = require('prettyjson');
-const utils = require('./helpers/utils');
+const { isEmpty, when } = require('./lib/utils');
 const EventEmitter = require('events').EventEmitter;
 const inherits = require('util').inherits;
 const lcd = require('./helpers/lcd');
@@ -10,7 +10,6 @@ const Table = require('cli-table');
 const request = require('request').defaults({ encoding: null });
 
 const identity = function(obj) { return obj; };
-const when = utils.when;
 const green = clc.greenBright;
 const white = clc.white;
 const yellow = clc.yellow;
@@ -399,8 +398,7 @@ const ChatExpress = function(options) {
     // check for chatId, if not present check for userId-chatId translator, otherwise fail
     stack = stack.then(message => {
       const { transport } = instanceOptions;
-
-      if (!_.isEmpty(message.payload.chatId)) {
+      if (!isEmpty(message.payload.chatId)) {
         return message;
       } else if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
         console.log('calling getChatIdFromUserId....', message.originalMessage.userId, message != null);
@@ -408,7 +406,7 @@ const ChatExpress = function(options) {
           return when(_globalCallbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport, message))
             .then(chatId => {
               console.log('obtained chatId', chatId);
-              if (_.isEmpty(chatId)) {
+              if (isEmpty(chatId)) {
                 throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
               } else {
                 message.payload.chatId = chatId;

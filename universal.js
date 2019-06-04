@@ -1,43 +1,43 @@
-var moment = require('moment');
-var ChatExpress = require('./chat-platform');
-var utils = require('./lib/utils');
-var when = utils.when;
-var _ = require('underscore');
+const moment = require('moment');
+const ChatExpress = require('./chat-platform');
+const utils = require('./lib/utils');
+const when = utils.when;
+const _ = require('underscore');
 
-var Universal = new ChatExpress({
+const Universal = new ChatExpress({
   transport: 'universal',
   transportDescription: 'Universal Connector',
-  chatIdKey: function(payload) {
+  chatIdKey(payload) {
     return payload.chatId;
   },
-  userIdKey: function(payload) {
+  userIdKey(payload) {
     return payload.userId;
   },
-  tsKey: function() {
+  tsKey() {
     return moment();
   },
-  language: function() {
+  language() {
     return null;
   },
-  onStart: function() {
-    var options = this.getOptions();
+  onStart() {
+    const options = this.getOptions();
     return _.isFunction(options._onStart) ? when(options._onStart()) : when(true);
   },
-  onStop: function() {
-    var options = this.getOptions();
+  onStop() {
+    const options = this.getOptions();
     return _.isFunction(options._onStop) ? when(options._onStop()) : when(true);
   }
 });
 
 
 Universal.mixin({
-  onStart: function(func) {
-    var options = this.getOptions();
+  onStart(func) {
+    const options = this.getOptions();
     options._onStart = func.bind(this);
     return this;
   },
-  onStop: function(func) {
-    var options = this.getOptions();
+  onStop(func) {
+    const options = this.getOptions();
     options._onStop = func.bind(this);
     return this;
   }

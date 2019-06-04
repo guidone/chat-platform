@@ -8,6 +8,7 @@ const red = clc.red;
 const ChatExpress = require('./chat-platform');
 const ContextProviders = require('./chat-context-factory');
 const ChatLog = require('./chat-log');
+const UniversalPlatform = require('./universal');
 
 const jsonPackage = fs.readFileSync(`${__dirname}/package.json`);
 let version;
@@ -26,4 +27,4 @@ console.log(grey('Running at: ' + __dirname) + ' Version: ' + green(version));
 // eslint-disable-next-line no-console
 console.log('');
 
-module.exports = { ChatExpress, ContextProviders, ChatLog };
+module.exports = { ChatExpress, ContextProviders, ChatLog, UniversalPlatform };
