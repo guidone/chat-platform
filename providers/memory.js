@@ -9,46 +9,43 @@ function MemoryStore(defaults) {
   return this;
 }
 _.extend(MemoryStore.prototype, {
-  get: function(key) {
-    var _this = this;
-    var keys = Array.prototype.slice.call(arguments, 0);
+  get(key) {
+    const keys = Array.prototype.slice.call(arguments, 0);
     if (keys.length === 1) {
       return this._context[key] != null ? this._context[key] : null;
     }
-    var result = {};
-    _(keys).each(function (key) {
-      result[key] = _this._context[key];
+    const result = {};
+    _(keys).each(key => {
+      result[key] = this._context[key];
     });
     return result;
   },
-  remove: function() {
-    var _this = this;
-    var keys = _.clone(arguments);
-    _(keys).each(function(key) {
+  remove() {
+    const keys = _.clone(arguments);
+    _(keys).each(key => {
       // eslint-disable-next-line prefer-reflect
-      delete _this._context[key];
+      delete this._context[key];
     });
     return this;
   },
-  set: function(key, value) {
-    var _this = this;
+  set(key, value) {
     if (_.isString(key)) {
       this._context[key] = value;
     } else if (_.isObject(key)) {
-      _(key).each(function(value, key) {
-        _this._context[key] = value;
+      _(key).each((value, key) => {
+        this._context[key] = value;
       });
     }
     return this;
   },
-  dump: function() {
+  dump() {
     // eslint-disable-next-line no-console
     console.log(this._context);
   },
-  all: function() {
+  all() {
     return this._context != null ? this._context : {};
   },
-  clear: function() {
+  clear() {
     this._context = {};
     return this;
   }
@@ -62,7 +59,7 @@ function MemoryFactory() {
     }
     const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
-      const memoryStore = new MemoryStore(defaults);
+      const memoryStore = new MemoryStore({ ... defaults, userId });
       _store[chatId] = memoryStore;
       if (!isEmpty(userId)) {
         _storeUserIds[userId] = memoryStore;
@@ -89,6 +86,11 @@ _.extend(MemoryFactory.prototype, {
   get: function(/*chatId, userId*/) {
   },
   getOrCreate: function(/*chatId, userId, defaults*/) {
+  },
+  reset() {
+    Object.keys(_store).forEach(key => delete _store[key]);
+    Object.keys(_storeUserIds).forEach(key => delete _storeUserIds[key]);
+    return this;
   },
   stop: function() {
     return new Promise(function(resolve) {
