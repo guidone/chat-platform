@@ -219,7 +219,6 @@ describe('Chat context provider memory', () => {
       .then(
         () => {},
         firstName => {
-          console.log('e', firstName);
           assert.isUndefined(firstName);
         });
   });

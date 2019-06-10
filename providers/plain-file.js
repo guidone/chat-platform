@@ -1,10 +1,7 @@
 const _ = require('underscore');
-
-
 const fs = require('fs');
 const moment = require('moment');
 const lcd = require('../helpers/lcd');
-const { isEmpty } = require('../lib/utils');
 const FileQueue = require('../helpers/promises-queue');
 const filesQueue = {};
 
@@ -85,20 +82,15 @@ const loadJson = file => {
 
 const loadOrCreateIndex = ({ path }) => {
   const indexPath = `${path}/index.json`;
-
-
   return exists(indexPath)
     .then(exists => {
-
       if (!exists) {
         let _index = { chatId: {}, userId: {} };
         return writeJson(indexPath, _index);
       } else {
-
         return loadJson(indexPath);
       }
     });
-
 };
 
 const saveIndex = ({ path }) => {
@@ -121,43 +113,16 @@ const getOrLoadOrCreateIndex = ({ path }) => {
   });
 };
 
-const loadFileStore = path => {
-  // todo if present in cache return immediately
-
-  const store = new FileStore(null, path);
-  return store.load()
-    .then(() => store);
-};
-
-
-/*const configExists = ({ userId, chatId, path }) => {
-  return new Promise((resolve) => {
-    if (!isEmpty(chatId)) {
-      return resolve(fs.existsSync(`${path}/${chatId}.json`));
-    } else if (!isEmpty(userId)) {
-      return resolve(fs.existsSync(`${path}/user-${userId}.json`));
-    }
-    return resolve(false);
-  });
-};
-
-const loadConfig = ({ userId, chatId, path, defaults }) => {
-  //return new Promise((resolve) => {
-
-  let storePath;
-  if (!isEmpty(chatId)) {
-    storePath = `${path}/${chatId}.json`;
-  } else if (!isEmpty(userId)) {
-    storePath = `${path}/user-${userId}.json`;
+const loadFileStore = (path, file) => {
+  if (_store[file] != null) {
+    return Promise.resolve(_store[file]);
   }
-
-  const store = new FileStore(null, storePath);
+  const store = new FileStore(null, `${path}/${file}`);
   return store.load()
-    .then(() => store.set(defaults))
     .then(() => store);
+};
 
-  //});
-};*/
+
 
 function FileFactory(params) {
 
@@ -175,20 +140,18 @@ function FileFactory(params) {
     const { path } = params;
 
     return new Promise((resolve, reject) => {
-
       // get the index from the memory cache or from file, if doesn't exist create it
       getOrLoadOrCreateIndex({ path })
         .then(index => {
-
-          // todo move this to the .get()
+          // if chatid or userid have a context, then loadit
           if (chatId != null && index.chatId[chatId] != null) {
-            return loadFileStore(`${path}/${index.chatId[chatId]}`)
+            return loadFileStore(path, index.chatId[chatId])
               .then(store => {
                 _store[index.chatId[chatId]] = store;
                 resolve(store);
               });
           } else if (userId != null && index.userId[userId] != null) {
-            return loadFileStore(`${path}/${index.userId[userId]}`)
+            return loadFileStore(path, index.userId[userId])
               .then(store => {
                 _store[index.userId[userId]] = store;
                 resolve(store);
@@ -196,8 +159,8 @@ function FileFactory(params) {
           } else {
             // file store doesn't exist yet, create one
             const fileName = `store${chatId != null ? `-c${chatId}` : ''}${userId != null ? `-u${userId}` : ''}.json`;
-
-            const store = new FileStore(null, `${path}/${fileName}`);
+            // store also userId if present
+            const store = new FileStore({ [userId != null ? 'userId' : null]: userId }, `${path}/${fileName}`);
             // store in the index the file reference
             if (chatId != null) {
               index.chatId[chatId] = fileName;
@@ -206,12 +169,10 @@ function FileFactory(params) {
               index.userId[userId] = fileName;
             }
             _store[fileName] = store;
-
+            // save index
             return saveIndex({ path })
-              .then(() => store.set({ ...defaults, chatId}))
-              .then(store => {
-                resolve(store);
-              });
+              .then(() => store.set({ ...defaults, chatId})) // todo move this up?
+              .then(store => resolve(store), reject);
           }
         });
 
@@ -238,10 +199,8 @@ _.extend(FileFactory.prototype, {
     + '{\n'
     + '"path": "/my-path/my-context-files"\n'
     +'}</pre>',
-  get: function(/*chatId*/) {
-  },
-  getOrCreate: function(/*chatId, defaults*/) {
-  },
+  get(/*chatId*/) { },
+  getOrCreate(/*chatId, defaults*/) { },
   start() {
     return new Promise(function(resolve) {
       resolve();
@@ -266,20 +225,16 @@ function FileStore(defaults, file) {
   return this;
 }
 _.extend(FileStore.prototype, {
-  get: function(key) {
-    var _this = this;
-    var keys = Array.prototype.slice.call(arguments, 0);
-    return new Promise(function(resolve, reject) {
-      _this.load()
-        .then(
-          function() {
+  get(key) {
+    const keys = Array.prototype.slice.call(arguments, 0);
+    return new Promise((resolve, reject) => {
+      this.load()
+        .then(() => {
             if (keys.length === 1) {
-              return resolve(_this._context[key]);
+              return resolve(this._context[key]);
             }
-            var result = {};
-            _(keys).each(function (key) {
-              result[key] = _this._context[key];
-            });
+            const result = {};
+            _(keys).each(key => result[key] = this._context[key]);
             resolve(result);
           },
           reject
@@ -287,47 +242,43 @@ _.extend(FileStore.prototype, {
     });
   },
 
-  parse: function(content) {
-    var _this = this;
-    var obj = null;
-    var date = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}\.[0-9]{1,3}Z$');
+  parse(content) {
+    let obj = null;
+    let date = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}\.[0-9]{1,3}Z$');
     try {
       obj = JSON.parse(content);
       // go through every key/value to search for a date-like string
-      _(obj).each(function(value, key) {
+      _(obj).each((value, key) => {
         if (_.isString(value) && value.match(date)) {
           obj[key] = moment(value);
         }
       });
     } catch(e) {
-      lcd.error('Error parsing context file: ' + _this.file);
+      lcd.error('Error parsing context file: ' + this.file);
       throw e;
     }
     return obj;
   },
 
-  load: function() {
-    var _this = this;
-    //var date = new RegExp('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{1,2}:[0-9]{1,2}:[0-9]{1,2}\.[0-9]{1,3}Z$');
-    return new Promise(function(resolve, reject) {
-      fs.readFile(_this._file, function(err, content) {
+  load() {
+    return new Promise((resolve, reject) => {
+      fs.readFile(this._file, (err, content) => {
         if (err != null) {
           reject(err);
         } else {
-          _this._context = _this.parse(content);
+          this._context = this.parse(content);
           resolve();
         }
       });
     });
   },
-  save: function() {
-    var _this = this;
+  save() {
     // store the value, before the task is executed or can be overwritten, it's a snapshot
-    var serialized = JSON.stringify(_.clone(_this._context));
-    var saveTask = function(resolve, reject) {
-      fs.writeFile(_this._file, serialized, function(err) {
+    const serialized = JSON.stringify(_.clone(this._context));
+    let saveTask = (resolve, reject) => {
+      fs.writeFile(this._file, serialized, err => {
         // put the object back, don't know what happens here but some key disapper
-        _this._context = _this.parse(serialized);
+        this._context = this.parse(serialized);
         if (err != null) {
           reject(err);
         } else {
@@ -336,23 +287,20 @@ _.extend(FileStore.prototype, {
       });
     };
 
-    if (filesQueue[_this._file] == null) {
-      filesQueue[_this._file] = new FileQueue();
+    if (filesQueue[this._file] == null) {
+      filesQueue[this._file] = new FileQueue();
     }
     // add to a queue to prevent concurrent writing
-    return filesQueue[_this._file].add(saveTask);
+    return filesQueue[this._file].add(saveTask);
   },
-  remove: function() {
-    var _this = this;
-    var keys = _.clone(arguments);
+  remove() {
+    const keys = _.clone(arguments);
     // eslint-disable-next-line no-undefined
-    return new Promise(function(resolve, reject) {
-      _this.load()
-        .then(function() {
-          _(keys).each(function(key) {
-            delete _this._context[key];
-          });
-          return _this.save();
+    return new Promise((resolve, reject) => {
+      this.load()
+        .then(() => {
+          _(keys).each(key => delete this._context[key]);
+          return this.save();
         })
         .then(resolve, reject);
     });
@@ -365,14 +313,14 @@ _.extend(FileStore.prototype, {
     }
     return this.save().then(() => this);
   },
-  dump: function() {
+  dump() {
     // eslint-disable-next-line no-console
     console.log(this._context);
   },
-  all: function() {
+  all() {
     return this._context;
   },
-  clear: function() {
+  clear() {
     this._context = {};
     return this.save();
   }

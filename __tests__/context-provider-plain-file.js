@@ -167,5 +167,24 @@ describe('Chat context provider file', () => {
       });
   });
 
+  it('should set some value with chatId and userId', () => {
+    return when(provider.getOrCreate(42, 44, {}))
+      .then(chatContext => chatContext.set('firstName', 'Guidone'))
+      .then(() => when(provider.get(42, null).get('firstName')))
+      .then(firstName => assert.equal(firstName, 'Guidone'))
+      .then(() => provider.get(42, null).get('userId'))
+      .then(userId => assert.equal(userId, 44))
+      .then(() => provider.get(42, null).get('chatId'))
+      .then(chatId => assert.equal(chatId, 42))
+      .then(() => provider.get(null, 44).get('firstName'))
+      .then(firstName => assert.equal(firstName, 'Guidone'))
+      .then(() => provider.get(null, 44).get('userId'))
+      .then(userId => assert.equal(userId, 44))
+      .then(() => provider.get(null, 44).get('chatId'))
+      .then(chatId => assert.equal(chatId, 42))
+      .then(() => when(provider.get(42, null).remove('firstName')))
+      .then(() => when(provider.get(42, null).get('firstName')))
+      .then(() => {}, firstName => assert.isUndefined(firstName));
+  });
 
 });
