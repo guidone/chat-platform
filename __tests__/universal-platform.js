@@ -13,29 +13,23 @@ chai.use(spies);
 describe('Universal Connector', () => {
 
   let chatServer = null;
+  let chatServerAlt = null;
   let sendFunction = null;
 
-  beforeEach(function() {
-    sendFunction = chai.spy(function() { });
+  beforeEach(() => {
+    // Fake chat server
+    sendFunction = chai.spy(() => { });
     chatServer = Universal.createServer({
       contextProvider: contextProviders.getProvider('memory'),
       debug: false
     });
-    chatServer.onUserId(function(payload) {
-      return payload.user.id;
-    });
-    chatServer.onChatId(function(payload) {
-      return payload.chat_id;
-    });
-    chatServer.onMessageId(function(payload) {
-      return payload._id;
-    });
-    chatServer.onLanguage(function(payload) {
-      return payload.lang;
-    });
-    chatServer.in(function (message) {
-      return new Promise(function(resolve, reject) {
-        var chat = message.chat();
+    chatServer.onUserId(payload => payload.user.id);
+    chatServer.onChatId(payload => payload.chat_id);
+    chatServer.onMessageId(payload => payload._id);
+    chatServer.onLanguage(payload =>payload.lang);
+    chatServer.in(message => {
+      return new Promise((resolve) => {
+        const chat = message.chat();
         if (message.originalMessage.text != null) {
           chat.set('payload', message.originalMessage.text);
           message.payload.content = message.originalMessage.text;
@@ -44,18 +38,58 @@ describe('Universal Connector', () => {
         resolve(message);
       });
     });
-    chatServer.use(function (message) {
-      return new Promise(function(resolve, reject) {
+    chatServer.use(message => new Promise((resolve, reject) => {
         message.custom_value = 42;
         resolve(message);
-      });
-    });
-    chatServer.out('a-message-type', function(message) {
-      return new Promise(function(resolve) {
+      })
+    );
+    chatServer.out('a-message-type', message => new Promise(resolve => {
         message.message_id = '444';
         sendFunction();
         resolve(message);
+      })
+    );
+    // Alt fake server
+    sendFunctionAlt = chai.spy(() => { });
+    chatServerAlt = Universal.createServer({
+      contextProvider: contextProviders.getProvider('memory'),
+      transport: 'universal-alt',
+      debug: false
+    });
+    chatServerAlt.onUserId(payload => payload.user.id);
+    chatServerAlt.onChatId(payload => payload.chat_id);
+    chatServerAlt.onMessageId(payload => payload._id);
+    chatServerAlt.onLanguage(payload =>payload.lang);
+    chatServerAlt.in(message => {
+      return new Promise((resolve) => {
+        const chat = message.chat();
+        if (message.originalMessage.text != null) {
+          chat.set('payload', message.originalMessage.text);
+          message.payload.content = message.originalMessage.text;
+          message.payload.type = 'message';
+        }
+        resolve(message);
       });
+    });
+    chatServerAlt.use(message => new Promise((resolve, reject) => {
+        message.custom_value = 42;
+        resolve(message);
+      })
+    );
+    chatServerAlt.out('a-message-type', message => new Promise(resolve => {
+        message.message_id = '445';
+        sendFunctionAlt();
+        resolve(message);
+      })
+    );
+    // store the global resolver
+    chatServer.onGetChatIdFromUserId((userId, transport, message) => {
+      if (userId === '1234' && transport === 'universal') {
+        return '42';
+      } else if (userId === '1234' && transport === 'universal-alt') {
+        return '43';
+      }
+      return null;
     });
   });
 
@@ -112,5 +146,45 @@ describe('Universal Connector', () => {
       .then(message => chatServer.send(message))
       .then(() => expect(sendFunction).to.not.have.been.called());
   });
+
+  it('create a message with just a userId and resolves it', () => {
+    return chatServer.start()
+      .then(() => chatServer.createMessage(null, '1234', '4567', {
+        payload: {
+          type: 'a-message-type'
+        }
+      }))
+      .then(message => chatServer.send(message))
+      .then(() => expect(sendFunction).to.have.been.called());
+  });
+
+  it('create a message with just a userId and doesn\'t resolve it', () => {
+    return chatServer.start()
+      .then(() => chatServer.createMessage(null, '5678', '4567', {
+        payload: {
+          type: 'a-message-type'
+        }
+      }))
+      .then(message => chatServer.send(message))
+      .then(
+        () => {},
+        e => {
+          assert.include(e.toString(), 'Error: The userId<->chatId resolver was not able to find a valid chatId for user 5678');
+          expect(sendFunction).to.not.have.been.called()
+        }
+      );
+  });
+
+  it('create a message with a server and just a userId and try to send to the other server', () => {
+    return chatServer.start()
+      .then(() => chatServer.createMessage(null, '1234', '4567', {
+        payload: {
+          type: 'a-message-type'
+        }
+      }))
+      .then(message => chatServerAlt.send(message))
+      .then(() => expect(sendFunctionAlt).to.have.been.called());
+  });
+
 
 });

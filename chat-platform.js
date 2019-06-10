@@ -401,11 +401,11 @@ const ChatExpress = function(options) {
       if (!isEmpty(message.payload.chatId)) {
         return message;
       } else if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
-        console.log('calling getChatIdFromUserId....', message.originalMessage.userId, message != null);
+        //console.log('calling getChatIdFromUserId....', message.originalMessage.userId, message != null);
         try {
           return when(_globalCallbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport, message))
             .then(chatId => {
-              console.log('obtained chatId', chatId);
+              //console.log('obtained chatId', chatId);
               if (isEmpty(chatId)) {
                 throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
               } else {
