@@ -399,34 +399,50 @@ const ChatExpress = function(options) {
     stack = stack.then(message => {
       const { transport } = instanceOptions;
       if (!isEmpty(message.payload.chatId)) {
+        // if there's a chatId, everything ok, skip
         return message;
       } else if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && message.originalMessage.userId != null) {
-        //console.log('calling getChatIdFromUserId....', message.originalMessage.userId, message != null);
+        // try to call the callback
         try {
           return when(_globalCallbacks.getChatIdFromUserId.call(chatServer, message.originalMessage.userId, transport, message))
-            .then(chatId => {
-              //console.log('obtained chatId', chatId);
-              if (isEmpty(chatId)) {
-                throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}`);
-              } else {
-                message.payload.chatId = chatId;
-                return message;
+            .then(
+              chatId => {
+                if (isEmpty(chatId)) {
+                  // eslint-disable-next-line no-console
+                  console.log(lcd.error(`[onGetChatIdFromUserId] The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}(${transport})`));
+                  throw new Error(`The userId<->chatId resolver was not able to find a valid chatId for user ${message.originalMessage.userId}(${transport})`);
+                } else {
+                  if (instanceOptions.debug) {
+                    // eslint-disable-next-line no-console
+                    console.log(lcd.green('[onGetChatIdFromUserId]') + lcd.grey(` Resolved ${message.originalMessage.userId}(${transport}) in chatId:${chatId}`));
+                  }
+                  message.payload.chatId = chatId;
+                  return message;
+                }
               }
-            });
+            );
         } catch(e) {
-          // todo better error displaying
           // eslint-disable-next-line no-console
-          console.log('Error in resolver chatId<->userId', e);
-          throw new Error('Error in resolver chatId<->userId', e);
+          console.log(lcd.error(`[onGetChatIdFromUserId] runtime error in chatId<->userId resolver for user ${message.originalMessage.userId}(${transport})`));
+          lcd.dump(e);
+          throw new Error(`[onGetChatIdFromUserId] runtime error in chatId<->userId resolver for user ${message.originalMessage.userId}(${transport})`);
         }
-
       } else {
+        // provide some feedback for not being able to resolve a chatId
+        if (instanceOptions.debug) {
+          if (_.isFunction(_globalCallbacks.getChatIdFromUserId) && isEmpty(message.originalMessage.userId)) {
+            // eslint-disable-next-line no-console
+            console.log(lcd.warn(`[onGetChatIdFromUserId] Callback was provided but incoming message has no userId (${transport}), unable to resolve a valid chatId`));
+          } else if (!_.isFunction(_globalCallbacks.getChatIdFromUserId)) {
+            // eslint-disable-next-line no-console
+            console.log(lcd.warn(`[onGetChatIdFromUserId] Callback was NOT provided and chatId is empty `));
+          }
+        }
         // raise error only if not relaxChatId
         if (!instanceOptions.relaxChatId) {
           throw new Error('Incoming message has empty chatId and no chatId - userId resolved has been provided');
         }
       }
-
       return message;
     });
     // run general middleware
