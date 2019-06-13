@@ -415,6 +415,7 @@ const ChatExpress = function(options) {
             });
         } catch(e) {
           // todo better error displaying
+          // eslint-disable-next-line no-console
           console.log('Error in resolver chatId<->userId', e);
           throw new Error('Error in resolver chatId<->userId', e);
         }
@@ -692,6 +693,7 @@ const ChatExpress = function(options) {
           this.emit('error', text);
         };
         this.log = function(obj) {
+          // eslint-disable-next-line no-console
           console.log(prettyjson.render(obj));
         };
         this.request = function(options = {}) {
@@ -910,6 +912,7 @@ const ChatExpress = function(options) {
               });
           } catch(e) {
             // todo better error displaying
+            // eslint-disable-next-line no-console
             console.log('Error in resolver chatId<->userId', e);
             throw new Error('Error in resolver chatId<->userId', e);
           }
@@ -921,10 +924,11 @@ const ChatExpress = function(options) {
           try {
             return when(_globalCallbacks.onGetPreferredTransport.call(chatServer, userId, message))
               .then(preferredTransport => {
-                return preferredTransport === transport;
+                return preferredTransport === this.options.transport;
               });
           } catch(e) {
             // todo better error displaying
+            // eslint-disable-next-line no-console
             console.log('Error in resolver chatId<->preferred transport', e);
             throw new Error('Error in resolver chatId<->preferred transport', e);
           }
