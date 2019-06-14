@@ -17,10 +17,10 @@ const red = clc.red;
 const orange = clc.xterm(214);
 const grey = clc.blackBright;
 
-var _messageTypes = [];
-var _events = [];
-var _platforms = {};
-var _globalCallbacks = {};
+let _messageTypes = [];
+let _events = [];
+let _platforms = {};
+let _globalCallbacks = {};
 
 const ChatExpress = function(options) {
 
@@ -1099,6 +1099,11 @@ ChatExpress.isSupported = function(platform, type) {
     var messageType = _(_messageTypes).findWhere({ type: type });
     return messageType != null && messageType.platforms[platform];
   }
+};
+
+ChatExpress.reset = function() {
+  // reset global callbacks, will be re-registered with deploy
+  _globalCallbacks = {};
 };
 
 module.exports = ChatExpress;

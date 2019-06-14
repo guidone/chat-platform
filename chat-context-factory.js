@@ -1,10 +1,12 @@
-var _ = require('underscore');
+const _ = require('underscore');
 
-var contextProviders = {};
+const contextProviders = {};
 contextProviders.memory = require('./providers/memory');
 contextProviders['plain-file'] = require('./providers/plain-file');
 
-module.exports = function(RED) {
+let _contexts = {};
+
+const ContextProviders = function(RED) {
 
   RED = RED || {};
   // register Slack server
@@ -36,9 +38,9 @@ module.exports = function(RED) {
     };
   }
 
-  var methods = {
+  const methods = {
 
-    when: function (param) {
+    when(param) {
       if (param != null && _.isFunction(param.then)) {
         return param;
       } else if (param != null) {
@@ -51,19 +53,39 @@ module.exports = function(RED) {
       });
     },
 
-    getProviders: function() {
+    getProviders() {
       return _.keys(contextProviders);
     },
 
-    hasProvider: function(provider) {
+    hasProvider(provider) {
       return _(methods.getProviders()).contains(provider);
     },
 
-    getProvider: function(providerName, params) {
-      var provider = contextProviders[providerName];
-      return new provider(params);
-    }
+    getProvider(providerName, params = {}) {
+      const provider = contextProviders[providerName];
+      const context = new provider(params);
+      if (params.id != null) {
+        _contexts[params.id] = context;
+      }
+      return context;
+    },
 
+    reset() {
+      _contexts = {};
+    }
   };
+
   return methods;
 };
+
+// Static methods
+
+ContextProviders.getProviderById = function(id) {
+  return _contexts[id];
+};
+
+ContextProviders.reset = function() {
+  return _contexts = {};
+};
+
+module.exports = ContextProviders;
