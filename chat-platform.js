@@ -435,7 +435,7 @@ const ChatExpress = function(options) {
             console.log(lcd.warn(`[onGetChatIdFromUserId] Callback was provided but incoming message has no userId (${transport}), unable to resolve a valid chatId`));
           } else if (!_.isFunction(_globalCallbacks.getChatIdFromUserId)) {
             // eslint-disable-next-line no-console
-            console.log(lcd.warn(`[onGetChatIdFromUserId] Callback was NOT provided and chatId is empty `));
+            console.log(lcd.warn('[onGetChatIdFromUserId] Callback was NOT provided and chatId is empty'));
           }
         }
         // raise error only if not relaxChatId
