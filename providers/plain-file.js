@@ -254,7 +254,8 @@ _.extend(FileStore.prototype, {
         }
       });
     } catch(e) {
-      lcd.error('Error parsing context file: ' + this.file);
+      // eslint-disable-next-line no-console
+      console.log(lcd.error('Error parsing context file: ' + this._file));
       throw e;
     }
     return obj;
