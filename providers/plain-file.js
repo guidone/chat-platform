@@ -1,6 +1,7 @@
 const _ = require('underscore');
 const fs = require('fs');
 const moment = require('moment');
+const crypto = require('crypto');
 const lcd = require('../helpers/lcd');
 const FileQueue = require('../helpers/promises-queue');
 const filesQueue = {};
@@ -122,6 +123,9 @@ const loadFileStore = (path, file) => {
     .then(() => store);
 };
 
+const generateFileName = function(chatId, userId) {
+  return 'store-' + crypto.createHash('md5').update(`${chatId}${userId}`).digest('hex') + '.json';
+};
 
 
 function FileFactory(params) {
@@ -158,7 +162,7 @@ function FileFactory(params) {
               });
           } else {
             // file store doesn't exist yet, create one
-            const fileName = `store${chatId != null ? `-c${chatId}` : ''}${userId != null ? `-u${userId}` : ''}.json`;
+            const fileName = generateFileName(chatId, userId);
             // store also userId if present
             const store = new FileStore({ [userId != null ? 'userId' : null]: userId }, `${path}/${fileName}`);
             // store in the index the file reference
