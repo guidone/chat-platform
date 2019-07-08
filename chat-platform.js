@@ -42,7 +42,8 @@ const ChatExpress = function(options) {
     routesDescription: null,
     events: null,
     relaxChatId: false,
-    bundle: false
+    bundle: false,
+    multiWebHook: true
   }, options);
 
   this.ins = [];
@@ -538,15 +539,15 @@ const ChatExpress = function(options) {
 
   function unmountRoutes(RED, routes, chatServer) {
     if (routes != null) {
-      var endpoints = _(routes).keys();
+      const endpoints = _(routes).keys();
       if (!_.isEmpty(endpoints)) {
-        var routesCount = RED.httpNode._router.stack.length;
-        var idx = 0;
-        var stack = RED.httpNode._router.stack;
+        let routesCount = RED.httpNode._router.stack.length;
+        let idx = 0;
+        let stack = RED.httpNode._router.stack;
         for(; idx < stack.length;) {
-          var route = stack[idx];
+          const route = stack[idx];
           if (route != null && route.name != null) {
-            var routeName = String(route.name).replace('bound ', '');
+            const routeName = String(route.name).replace('bound ', '');
             if (_.contains(endpoints, routeName)) {
               stack.splice(idx, 1);
             } else {
@@ -564,29 +565,43 @@ const ChatExpress = function(options) {
     }
   }
 
+  function generateCallback(route, chatServer) {
+    const options = chatServer.getOptions();
+    const { webHookScheme, multiWebHook } = options;
+    // build specific url if needed
+    let specificUrl = '';
+    if (multiWebHook && _.isFunction(webHookScheme)) {
+      specificUrl = webHookScheme.call(chatServer);
+    }
+    return `${route}${specificUrl != null ? `/${specificUrl}` : ''}`;
+  }
+
   // eslint-disable-next-line max-params
   function mountRoutes(RED, routes, routesDescription, chatServer) {
     if (routes != null && RED == null) {
       chatServer.warn('"RED" param is empty, impossible to mount the routes');
     }
     if (routes != null && RED != null) {
-      var uiPort = RED.settings.get('uiPort');
-      var options = chatServer.getOptions();
+      const uiPort = RED.settings.get('uiPort');
+      const options = chatServer.getOptions();
       // eslint-disable-next-line no-console
       console.log('');
       // eslint-disable-next-line no-console
       console.log(grey('------ WebHooks for ' + options.transport.toUpperCase() + '----------------'));
-      _(routes).map(function (middleware, route) {
-        RED.httpNode.use(route, middleware.bind(chatServer));
-        var description = null;
+      _(routes).map((middleware, route) => {
+        const host = 'http://localhost' + (uiPort != '80' ? ':' + uiPort : '');
+        const callback = generateCallback(route, chatServer);
+        // make description
+        let description = null;
         if (routesDescription != null && _.isString(routesDescription[route])) {
           description = routesDescription[route];
         } else if (routesDescription != null && _.isFunction(routesDescription[route])) {
           description = routesDescription[route].call(chatServer);
         }
         // eslint-disable-next-line no-console
-        console.log(green('http://localhost' + (uiPort != '80' ? ':' + uiPort : '') + route)
-          + (description != null ? grey(' - ') + white(description) : ''));
+        console.log(green(host + callback) + (description != null ? grey(' - ') + white(description) : ''));
+        // attach to Express instance
+        RED.httpNode.use(callback, middleware.bind(chatServer));
         return null;
       });
       // eslint-disable-next-line no-console
