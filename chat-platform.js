@@ -659,12 +659,12 @@ const ChatExpress = function(options) {
       return methods;
     },
 
-    registerMessageType: function(type, name, description) {
+    registerMessageType: function(type, name, description, validator) {
       if (type == null || typeof type !== 'string') {
         throw 'Missing type in .registerMessageType()';
       }
       name = name != null ? name : _s.capitalize(type);
-      var typeDescriptor = _(_messageTypes).findWhere({ type: type });
+      let typeDescriptor = _(_messageTypes).findWhere({ type: type });
       if (typeDescriptor == null) {
         typeDescriptor = { type: type };
         _messageTypes.push(typeDescriptor);
@@ -678,7 +678,13 @@ const ChatExpress = function(options) {
       if (typeDescriptor.platforms == null) {
         typeDescriptor.platforms = {};
       }
+      if (typeDescriptor.validators == null) {
+        typeDescriptor.validators = {};
+      }
       typeDescriptor.platforms[options.transport] = true;
+      if (_.isFunction(validator)) {
+        typeDescriptor.validators[options.transport] = validator;
+      }
       return this;
     },
     registerEvent: function(name, description) {
@@ -798,12 +804,12 @@ const ChatExpress = function(options) {
         this.getUseMiddleWares = function() {
           return _uses;
         };
-        this.registerMessageType = function(type, name, description) {
+        this.registerMessageType = function(type, name, description, validator) {
           if (type == null || typeof type !== 'string') {
             throw 'Missing type in .registerMessageType()';
           }
           name = name != null ? name : _s.capitalize(type);
-          var typeDescriptor = _(_messageTypes).findWhere({ type: type });
+          let typeDescriptor = _(_messageTypes).findWhere({ type: type });
           if (typeDescriptor == null) {
             typeDescriptor = { type: type };
             _messageTypes.push(typeDescriptor);
@@ -817,7 +823,13 @@ const ChatExpress = function(options) {
           if (typeDescriptor.platforms == null) {
             typeDescriptor.platforms = {};
           }
+          if (typeDescriptor.validators == null) {
+            typeDescriptor.validators = {};
+          }
           typeDescriptor.platforms[options.transport] = true;
+          if (_.isFunction(validator)) {
+            typeDescriptor.validators[options.transport] = validator;
+          }
           return this;
         };
         this.registerEvent = function(name, description) {
@@ -1108,12 +1120,35 @@ ChatExpress.getPlatforms = function() {
  */
 ChatExpress.isSupported = function(platform, type) {
   if (type == null) {
-    var platforms = ChatExpress.getPlatforms();
+    const platforms = ChatExpress.getPlatforms();
     return _(platforms).findWhere({ id: platform }) != null;
   } else {
-    var messageType = _(_messageTypes).findWhere({ type: type });
+    const messageType = _(_messageTypes).findWhere({ type: type });
     return messageType != null && messageType.platforms[platform];
   }
+};
+
+/**
+ * @method isValidFile
+ * Check if a file type is valid (extension, size, etc), if nothing is specified file is assumed to be valid
+ * @param {String} platform Platform id (telegram, facebook, ...)
+ * @param {String} type Message type (image, document, ...)
+ * @param {Object} file The file descriptor
+ * @param {String} file.filename The filename of the file
+ * @param {Buffer} file.buffer The buffer
+ * @param {String} file.extension The extension of the file (with leading dot)
+ * @param {String} file.mimeType Mime type of the file
+ * @return {String} Null if no errors
+ */
+ChatExpress.isValidFile = function(platform, type, file) {
+  const messageType = _(_messageTypes).findWhere({ type: type });
+  if (messageType != null) {
+    const validator = messageType.validators[platform];
+    if (validator != null) {
+      return validator(file);
+    }
+  }
+  return null;
 };
 
 ChatExpress.reset = function() {
