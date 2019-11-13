@@ -17,9 +17,17 @@ const red = clc.red;
 const orange = clc.xterm(214);
 const grey = clc.blackBright;
 
-let _messageTypes = [];
-let _events = [];
-let _platforms = {};
+if (global['redbot-chat-platform'] == null) {
+  global['redbot-chat-platform'] = {
+    messageTypes: [],
+    events:  [],
+    platforms: {}  
+  };
+}
+
+let _messageTypes = global['redbot-chat-platform'].messageTypes;
+let _events = global['redbot-chat-platform'].events;
+let _platforms = global['redbot-chat-platform'].platforms;
 let _globalCallbacks = {};
 
 const ChatExpress = function(options) {
