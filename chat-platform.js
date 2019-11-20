@@ -21,19 +21,22 @@ if (global['redbot-chat-platform'] == null) {
   global['redbot-chat-platform'] = {
     messageTypes: [],
     events:  [],
-    platforms: {}  
+    platforms: {},
+    params: {}  
   };
 }
 
 let _messageTypes = global['redbot-chat-platform'].messageTypes;
 let _events = global['redbot-chat-platform'].events;
 let _platforms = global['redbot-chat-platform'].platforms;
+let _params = global['redbot-chat-platform'].params;
 let _globalCallbacks = {};
 
 const ChatExpress = function(options) {
 
   const _this = this;
   this.options = _.extend({
+    color: null,
     contextProvider: null,
     connector: null,
     inboundMessage: null,
@@ -62,7 +65,8 @@ const ChatExpress = function(options) {
   _platforms[this.options.transport] = {
     id: this.options.transport,
     name: this.options.transportDescription,
-    universal: false
+    universal: false,
+    color: this.options.color != null ? this.options.color : '#bbbbbb'
   };
 
   // configuration warnings
@@ -714,6 +718,29 @@ const ChatExpress = function(options) {
       eventDescriptor.platforms[options.transport] = true;
       return this;
     },
+    registerParam: function(name, type, config = {}) {
+      console.log('registerParam 1')
+      if (name == null || typeof name !== 'string') {
+        throw 'Missing name in .registerParam()';
+      }
+      if (type == null || typeof type !== 'string') {
+        throw 'Missing type in .registerParam()';
+      }
+      if (_params[options.transport] == null) {
+        _params[options.transport] = [];
+      }
+
+      _params[options.transport].push({
+        name,
+        type,
+        label: !_.isEmpty(config.label) ? config.label : name,
+        description: config.description,      
+        default: config.default 
+      });
+
+      return this;
+    },
+
     createServer: function(options) {
 
       options = _.extend({}, _this.options, options);
@@ -858,6 +885,13 @@ const ChatExpress = function(options) {
           }
           eventDescriptor.platforms[options.transport] = true;
           return this;
+        };
+        this.registerParam = function(name, type) {
+          if (name == null || typeof name !== 'string') {
+            throw 'Missing name in .registerParam()';
+          }
+    
+          
         };
         this.registerPlatform = function(name, label) {
           _platforms[name] = {
@@ -1037,6 +1071,9 @@ ChatExpress.getEvents = function() {
     };
   });
 };
+ChatExpress.getParams = function() {
+  return _params;
+};
 
 function compatibilityTable(items, options) {
   options = _.extend({ column: 'Column' }, options);
@@ -1110,7 +1147,8 @@ ChatExpress.getPlatforms = function() {
       return {
         id: _platforms[platform].id,
         name: _platforms[platform].name,
-        universal: _platforms[platform].universal
+        universal: _platforms[platform].universal,
+        color: _platforms[platform].color
       };
     })
     .sortBy(function(platform) {
