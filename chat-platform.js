@@ -719,7 +719,6 @@ const ChatExpress = function(options) {
       return this;
     },
     registerParam: function(name, type, config = {}) {
-      console.log('registerParam 1')
       if (name == null || typeof name !== 'string') {
         throw 'Missing name in .registerParam()';
       }
@@ -729,15 +728,14 @@ const ChatExpress = function(options) {
       if (_params[options.transport] == null) {
         _params[options.transport] = [];
       }
-
       _params[options.transport].push({
         name,
         type,
+        placeholder: config.placeholder,
         label: !_.isEmpty(config.label) ? config.label : name,
         description: config.description,      
         default: config.default 
       });
-
       return this;
     },
 
@@ -886,12 +884,25 @@ const ChatExpress = function(options) {
           eventDescriptor.platforms[options.transport] = true;
           return this;
         };
-        this.registerParam = function(name, type) {
+        this.registerParam = function(name, type, config = {}) {
           if (name == null || typeof name !== 'string') {
             throw 'Missing name in .registerParam()';
           }
-    
-          
+          if (type == null || typeof type !== 'string') {
+            throw 'Missing type in .registerParam()';
+          }
+          if (_params[options.transport] == null) {
+            _params[options.transport] = [];
+          }
+          _params[options.transport].push({
+            name,
+            type,
+            placeholder: config.placeholder,
+            label: !_.isEmpty(config.label) ? config.label : name,
+            description: config.description,      
+            default: config.default 
+          });
+          return this;
         };
         this.registerPlatform = function(name, label) {
           _platforms[name] = {
