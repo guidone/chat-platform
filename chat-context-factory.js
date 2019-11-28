@@ -81,7 +81,6 @@ const ContextProviders = function(RED) {
 // Static methods
 
 ContextProviders.getProviderById = function(id) {
-  console.log('_contexts', id, _contexts);
   return _contexts[id];
 };
 
