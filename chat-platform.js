@@ -382,6 +382,10 @@ const ChatExpress = function(options) {
   }
 
   function outboundMessage(message, chatServer) {
+    // if simulator message, then skip, no matter what is the platform
+    if (message.originalMessage != null && message.originalMessage.simulator === true) {
+      return;
+    }
 
     const instanceOptions = chatServer.getOptions();
     // check if the message is from the right platform (in static class or instance)
