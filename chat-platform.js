@@ -738,7 +738,8 @@ const ChatExpress = function(options) {
         placeholder: config.placeholder,
         label: !_.isEmpty(config.label) ? config.label : name,
         description: config.description,      
-        default: config.default 
+        default: config.default,
+        options: config.options
       });
       return this;
     },
@@ -904,7 +905,8 @@ const ChatExpress = function(options) {
             placeholder: config.placeholder,
             label: !_.isEmpty(config.label) ? config.label : name,
             description: config.description,      
-            default: config.default 
+            default: config.default,
+            options: config.options 
           });
           return this;
         };
