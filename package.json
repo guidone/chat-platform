@@ -1,6 +1,6 @@
 {
   "name": "chat-platform",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "Universal Chat Platform",
   "main": "index.js",
   "scripts": {
