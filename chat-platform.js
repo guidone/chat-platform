@@ -617,7 +617,8 @@ const ChatExpress = function(options) {
         // eslint-disable-next-line no-console
         console.log(green(host + callback) + (description != null ? grey(' - ') + white(description) : ''));
         // attach to Express instance
-        RED.httpNode.use(callback, middleware.bind(chatServer));
+        const escaped = String(`^${callback}$`).replace(RegExp('/', 'g'), '\\/');
+        RED.httpNode.use(new RegExp(escaped), middleware.bind(chatServer));
         return null;
       });
       // eslint-disable-next-line no-console
