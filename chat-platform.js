@@ -589,7 +589,7 @@ const ChatExpress = function(options) {
     if (multiWebHook && _.isFunction(webHookScheme)) {
       specificUrl = webHookScheme.call(chatServer);
     }
-    return `${route}${specificUrl != null ? `/${specificUrl}` : ''}`;
+    return `${route}${!_.isEmpty(specificUrl) ? `/${specificUrl}` : ''}`;
   }
 
   // eslint-disable-next-line max-params
