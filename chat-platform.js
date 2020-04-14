@@ -22,7 +22,7 @@ if (global['redbot-chat-platform'] == null) {
     messageTypes: [],
     events:  [],
     platforms: {},
-    params: {}  
+    params: {}
   };
 }
 
@@ -164,10 +164,6 @@ const ChatExpress = function(options) {
     inboudMessage = inboudMessage || {};
 
     return when(contextProvider.getOrCreate(chatId, userId, {
-        chatId: chatId,
-        userId: userId,
-        messageId: messageId,
-        transport: options.transport,
         authorized: false,
         pending: false,
         language: null
@@ -195,6 +191,9 @@ const ChatExpress = function(options) {
         },
         client() {
           return options.connector;
+        },
+        get(value) {
+          return this.originalMessage[value];
         }
       });
       return onCreateMessage.call(chatServer, message);
@@ -250,6 +249,9 @@ const ChatExpress = function(options) {
       },
       client: function() {
         return chatServer.getOptions().connector;
+      },
+      get(value) {
+        return this.originalMessage[value];
       }
     };
     // create empty promise
@@ -261,11 +263,9 @@ const ChatExpress = function(options) {
       stack = stack
         .then(function() {
           return when(contextProvider.getOrCreate(parsedMessage.chatId, parsedMessage.userId, {
-            chatId: parsedMessage.chatId,
-            userId: parsedMessage.userId,
-            transport: parsedMessage.transport,
             language: parsedMessage.language,
-            authorized: false
+            authorized: false,
+            pending: false
           }));
         })
         .then(function() {
@@ -738,7 +738,7 @@ const ChatExpress = function(options) {
         type,
         placeholder: config.placeholder,
         label: !_.isEmpty(config.label) ? config.label : name,
-        description: config.description,      
+        description: config.description,
         default: config.default,
         options: config.options
       });
@@ -905,9 +905,9 @@ const ChatExpress = function(options) {
             type,
             placeholder: config.placeholder,
             label: !_.isEmpty(config.label) ? config.label : name,
-            description: config.description,      
+            description: config.description,
             default: config.default,
-            options: config.options 
+            options: config.options
           });
           return this;
         };
@@ -1215,17 +1215,39 @@ ChatExpress.isValidFile = function(platform, type, file) {
   return null;
 };
 
+/**
+ * @method registerParam
+ * Register param for all transport/platforms
+ * @param {String} name
+ * @param {String} type Type of param
+ * @param {Object} config Params of the param, pun intended
+ * @chainable
+ */
+ChatExpress.registerParam = function(name, type, config = {}) {
+  if (name == null || typeof name !== 'string') {
+    throw 'Missing name in .registerParam()';
+  }
+  if (type == null || typeof type !== 'string') {
+    throw 'Missing type in .registerParam()';
+  }
+  if (_params.all == null) {
+    _params.all = [];
+  }
+  _params.all.push({
+    name,
+    type,
+    placeholder: config.placeholder,
+    label: !_.isEmpty(config.label) ? config.label : name,
+    description: config.description,
+    default: config.default,
+    options: config.options
+  });
+  return this;
+};
+
 ChatExpress.reset = function() {
   // reset global callbacks, will be re-registered with deploy
   _globalCallbacks = {};
 };
 
 module.exports = ChatExpress;
-
-
-
-
-
-
-
-

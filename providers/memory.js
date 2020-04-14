@@ -59,7 +59,7 @@ function MemoryFactory() {
     }
     const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
-      const memoryStore = new MemoryStore({ ... defaults, userId });
+      const memoryStore = new MemoryStore({ ...defaults });
       _store[chatId] = memoryStore;
       if (!isEmpty(userId)) {
         _storeUserIds[userId] = memoryStore;
@@ -87,6 +87,11 @@ _.extend(MemoryFactory.prototype, {
   },
   getOrCreate: function(/*chatId, userId, defaults*/) {
   },
+  assignToUser(userId, context) {
+    // when merging a user into another, this trasnfer the current context to another user
+    // TODO perhaps remove other occurence
+    _storeUserIds[userId] = context;
+  },
   reset() {
     Object.keys(_store).forEach(key => delete _store[key]);
     Object.keys(_storeUserIds).forEach(key => delete _storeUserIds[key]);
@@ -106,4 +111,3 @@ _.extend(MemoryFactory.prototype, {
 
 
 module.exports = MemoryFactory;
-

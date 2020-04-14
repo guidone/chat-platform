@@ -43,4 +43,25 @@ Universal.mixin({
   }
 });
 
+ChatExpress.registerParam(
+  'messageFlag',
+  'select',
+  {
+    label: 'Flag message',
+    default: 'new',
+    description: 'Flag the message with a label and store on Mission Control',
+    placeholder: 'Select flag',
+    options: [
+      { value: 'answer', label: 'Answer' },
+      { value: 'default', label: 'Default' },
+      { value: 'error', label: 'Error' },
+      { value: 'info', label: 'Info' },
+      { value: 'new', label: 'New'},
+      { value: 'not_understood', label: 'Not understood' },
+      { value: 'question', label: 'Question' }
+    ]
+  }
+);
+
+
 module.exports = Universal;
