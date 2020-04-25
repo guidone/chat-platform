@@ -13,9 +13,10 @@ const isEmpty = value => value == null || value === '';
 
 
 
-function SQLiteStore(chatId, userId, defaults) {
+function SQLiteStore(chatId, userId, statics = {}) {
   this.chatId = String(chatId);
   this.userId = String(userId);
+  this.statics = statics;
   return this;
 }
 
@@ -60,7 +61,13 @@ function SQLiteFactory(params) {
         return payload[key] != null ? payload[key] : null;
       }
       const result = {};
-      keys.forEach(key => result[key] = payload[key]);
+      keys.forEach(key => {
+        if (this.statics[key] != null) {
+          result[key] = this.statics[key];
+        } else {
+          result[key] = payload[key];
+        }
+      });
       return result;
     },
     async remove() {
@@ -109,11 +116,19 @@ function SQLiteFactory(params) {
 
     async set(key, value) {
       let { id, payload } = await this.getPayload();
-      if (_.isString(key)) {
+      const staticKeys = Object.keys(this.statics);
+      if (_.isString(key) && staticKeys.includes(key)) {
+        console.log(`Warning: try to set a static key: ${key}`);
+      } else if (_.isObject(key) && _.intersection(staticKeys, Object.keys(key)).length !== 0) {
+        console.log(`Warning: try to set a static keys: ${_.intersection(staticKeys, Object.keys(key)).join(', ')}`);
+      }
+      // store values, skipping static keys
+      if (_.isString(key) && !staticKeys.includes(key)) {
         payload[key] = value;
       } else if (_.isObject(key)) {
-        payload = { ...payload, ...key };
+        payload = { ...payload, ..._.omit(key, staticKeys) };
       }
+
       await Context.update({ payload: JSON.stringify(payload) }, { where: { id }});
       return this;
     },
@@ -139,16 +154,22 @@ function SQLiteFactory(params) {
   // End definition if SQLite store
   // **
 
-  this.getOrCreate = async function(chatId, userId, defaults) {
+  this.getOrCreate = async function(chatId, userId, statics) {
     if (isEmpty(chatId) && isEmpty(userId)) {
       return null;
     }
-    // just create an class that just wraps chatId and userId
-    const store = new SQLiteStore(chatId, userId, { ...defaults });
+    // just create an class that just wraps chatId and userId, add static value (cline)
+    const store = new SQLiteStore(chatId, userId, { ...statics });
     return store;
   };
-  this.get = function(chatId, userId) {
-    return new SQLiteStore(chatId, userId);
+  this.get = function(chatId, userId, statics) {
+    return new SQLiteStore(chatId, userId, statics);
+  };
+  this.assignToUser = async (userId, context) => {
+    console.log('context',context);
+    console.log('userid', userId)
+
+    console.log('errore', erroro)
   };
   this.start = async () => {
     /*
@@ -200,8 +221,6 @@ _.extend(SQLiteFactory.prototype, {
   },
   assignToUser(userId, context) {
     // when merging a user into another, this trasnfer the current context to another user
-    // TODO perhaps remove other occurence
-    _storeUserIds[userId] = context;
   },
   reset() {
     // TODO implement reset
