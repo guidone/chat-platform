@@ -16,7 +16,11 @@ const isEmpty = value => value == null || value === '';
 function SQLiteStore(chatId, userId, statics = {}) {
   this.chatId = String(chatId);
   this.userId = String(userId);
-  this.statics = statics;
+  // make sure userId is always a string
+  this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
+  if (_.isEmpty(statics)) {
+    console.trace('Warning: empty statics vars')
+  }
   return this;
 }
 
@@ -58,7 +62,11 @@ function SQLiteFactory(params) {
       const keys = Array.from(arguments);
       const { payload } = await this.getPayload();
       if (keys.length === 1) {
-        return payload[key] != null ? payload[key] : null;
+        if (this.statics[keys[0]] != null) {
+          return this.statics[keys[0]];
+        } else {
+          return payload[key] != null ? payload[key] : null;
+        }
       }
       const result = {};
       keys.forEach(key => {
@@ -171,6 +179,9 @@ function SQLiteFactory(params) {
 
     console.log('errore', erroro)
   };
+  this.reset = async () => {
+    await Context.destroy({ where: {} });
+  };
   this.start = async () => {
     /*
       To test dropping the table
@@ -223,10 +234,6 @@ _.extend(SQLiteFactory.prototype, {
     // when merging a user into another, this trasnfer the current context to another user
   },
   reset() {
-    // TODO implement reset
-
-    //Object.keys(_store).forEach(key => delete _store[key]);
-    //Object.keys(_storeUserIds).forEach(key => delete _storeUserIds[key]);
     return this;
   },
   stop: function() {

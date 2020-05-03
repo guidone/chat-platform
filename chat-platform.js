@@ -178,7 +178,11 @@ const ChatExpress = function(options) {
           language: null
         },
         chat() {
-          return contextProvider.get(chatId, userId);
+          return contextProvider.get(
+            chatId,
+            userId,
+            { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+          );
         },
         api() {
           return chatServer;
@@ -242,7 +246,11 @@ const ChatExpress = function(options) {
         inbound: true
       },
       chat: function() {
-        return contextProvider.get(parsedMessage.chatId, parsedMessage.userId);
+        return contextProvider.get(
+          parsedMessage.chatId,
+          parsedMessage.userId,
+          { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+        );
       },
       api: function() {
         return chatServer;
@@ -261,13 +269,12 @@ const ChatExpress = function(options) {
     // if any context provider, then create the context
     if (contextProvider != null) {
       stack = stack
-        .then(function() {
-          return when(contextProvider.getOrCreate(parsedMessage.chatId, parsedMessage.userId, {
-            language: parsedMessage.language,
-            authorized: false,
-            pending: false
-          }));
-        })
+        .then(() => when(contextProvider.getOrCreate(
+          parsedMessage.chatId,
+          parsedMessage.userId,
+          { userId: parsedMessage.userId, transport: parsedMessage.transport, chatId: parsedMessage.chatId }
+        )))
+        .then(chatContext => when(chatContext.set({ language: parsedMessage.language, authorized: false, pending: false })))
         .then(function() {
           return when(message);
         });
