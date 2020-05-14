@@ -1,25 +1,43 @@
 const _ = require('underscore');
 const assert = require('chai').assert;
+const fs = require('fs');
 const RED = require('../lib/red-stub')();
 const ContextProviders = require('../chat-context-factory');
 const { when } = require('../lib/utils');
 
+const copyFile = (source, destination) => new Promise((resolve, reject) => {
+  fs.copyFile(source, destination, error => {
+    if (error != null) {
+      reject(error);
+    } else {
+      resolve();
+    }
+  });
+});
+
+const removeFile = file => new Promise((resolve, reject) => {
+  fs.unlink(file, error => {
+    if (error != null) {
+      reject(error);
+    } else {
+      resolve();
+    }
+  });
+});
 
 
 describe('Chat context provider sqlite', () => {
-
   const contextProviders = ContextProviders(RED);
-
   const getProvider = () => contextProviders.getProvider('sqlite', { dbPath: __dirname + '/dummy/mission-control.sqlite' });
 
   beforeAll(async () => {
+    await copyFile(__dirname + '/dummy/mission-control.backup', __dirname + '/dummy/mission-control.sqlite');
     const provider = getProvider();
     await provider.start();
   });
 
   afterAll(async () => {
-    const provider = getProvider();
-    await provider.drop();
+    await removeFile(__dirname + '/dummy/mission-control.sqlite');
   });
 
   beforeEach(async () => {
