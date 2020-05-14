@@ -14,8 +14,8 @@ const isEmpty = value => value == null || value === '';
 
 
 function SQLiteStore(chatId, userId, statics = {}) {
-  this.chatId = String(chatId);
-  this.userId = String(userId);
+  this.chatId = chatId != null ? String(chatId) : null;
+  this.userId = userId != null ? String(userId) : null;
   // make sure userId is always a string
   this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
   if (_.isEmpty(statics)) {
@@ -174,10 +174,6 @@ function SQLiteFactory(params) {
     return new SQLiteStore(chatId, userId, statics);
   };
   this.assignToUser = async (userId, context) => {
-    console.log('context',context);
-    console.log('userid', userId)
-
-    console.log('errore', erroro)
   };
   this.reset = async () => {
     await Context.destroy({ where: {} });

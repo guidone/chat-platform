@@ -10,5 +10,8 @@
     "rules": {
         "quotes": ["error", "single"],
         "no-useless-escape": 0
+    },
+    "parserOptions": {
+        "ecmaVersion": 8
     }
 }

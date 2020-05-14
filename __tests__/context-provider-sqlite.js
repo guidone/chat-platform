@@ -9,7 +9,7 @@ const { when } = require('../lib/utils');
 describe('Chat context provider sqlite', () => {
 
   const contextProviders = ContextProviders(RED);
-  console.log('dirname', __dirname)
+
   const getProvider = () => contextProviders.getProvider('sqlite', { dbPath: __dirname + '/dummy/mission-control.sqlite' });
 
   beforeEach(async () => {

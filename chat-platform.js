@@ -155,53 +155,54 @@ const ChatExpress = function(options) {
   }
 
   // eslint-disable-next-line max-params
-  function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
-
+  async function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
     const options = chatServer.getOptions();
-
     const contextProvider = options.contextProvider;
     const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
 
-    return when(contextProvider.getOrCreate(chatId, userId, {
-        authorized: false,
-        pending: false,
-        language: null
-      })
-    ).then(function() {
-      const message = _.extend({}, inboudMessage, {
-        originalMessage: {
-          chatId: chatId,
-          userId: userId,
-          messageId: messageId,
-          transport: options.transport,
-          language: null
-        },
-        chat() {
-          return contextProvider.get(
-            chatId,
-            userId,
-            { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
-          );
-        },
-        api() {
-          return chatServer;
-        },
-        isTransportAvailable(transport, message) {
-          return chatServer.isTransportAvailable(userId, transport, message);
-        },
-        isTransportPreferred(transport, message) {
-          return chatServer.isTransportPreferred(userId, transport, message);
-        },
-        client() {
-          return options.connector;
-        },
-        get(value) {
-          return this.originalMessage[value];
-        }
-      });
-      return onCreateMessage.call(chatServer, message);
+    const chatContext = await when(contextProvider.getOrCreate(chatId, userId, {
+      chatId: chatId,
+      userId: userId,
+      transport: options.transport,
+      }));
+    await chatContext.set({
+      authorized: false,
+      pending: false,
+      language: null
     });
+    const message = _.extend({}, inboudMessage, {
+      originalMessage: {
+        chatId: chatId,
+        userId: userId,
+        messageId: messageId,
+        transport: options.transport,
+        language: null
+      },
+      chat() {
+        return contextProvider.get(
+          chatId,
+          userId,
+          { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+        );
+      },
+      api() {
+        return chatServer;
+      },
+      isTransportAvailable(transport, message) {
+        return chatServer.isTransportAvailable(userId, transport, message);
+      },
+      isTransportPreferred(transport, message) {
+        return chatServer.isTransportPreferred(userId, transport, message);
+      },
+      client() {
+        return options.connector;
+      },
+      get(value) {
+        return this.originalMessage[value];
+      }
+    });
+    return onCreateMessage.call(chatServer, message);
   }
 
   function inboundMessage(payload, chatServer) {
