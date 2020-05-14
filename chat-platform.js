@@ -22,7 +22,7 @@ if (global['redbot-chat-platform'] == null) {
     messageTypes: [],
     events:  [],
     platforms: {},
-    params: {}  
+    params: {}
   };
 }
 
@@ -155,50 +155,54 @@ const ChatExpress = function(options) {
   }
 
   // eslint-disable-next-line max-params
-  function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
-
+  async function createMessage(chatId, userId, messageId, inboudMessage, chatServer) {
     const options = chatServer.getOptions();
-
     const contextProvider = options.contextProvider;
     const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
 
-    return when(contextProvider.getOrCreate(chatId, userId, {
+    const chatContext = await when(contextProvider.getOrCreate(chatId, userId, {
+      chatId: chatId,
+      userId: userId,
+      transport: options.transport,
+      }));
+    await chatContext.set({
+      authorized: false,
+      pending: false,
+      language: null
+    });
+    const message = _.extend({}, inboudMessage, {
+      originalMessage: {
         chatId: chatId,
         userId: userId,
         messageId: messageId,
         transport: options.transport,
-        authorized: false,
-        pending: false,
         language: null
-      })
-    ).then(function() {
-      const message = _.extend({}, inboudMessage, {
-        originalMessage: {
-          chatId: chatId,
-          userId: userId,
-          messageId: messageId,
-          transport: options.transport,
-          language: null
-        },
-        chat() {
-          return contextProvider.get(chatId, userId);
-        },
-        api() {
-          return chatServer;
-        },
-        isTransportAvailable(transport, message) {
-          return chatServer.isTransportAvailable(userId, transport, message);
-        },
-        isTransportPreferred(transport, message) {
-          return chatServer.isTransportPreferred(userId, transport, message);
-        },
-        client() {
-          return options.connector;
-        }
-      });
-      return onCreateMessage.call(chatServer, message);
+      },
+      chat() {
+        return contextProvider.get(
+          chatId,
+          userId,
+          { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+        );
+      },
+      api() {
+        return chatServer;
+      },
+      isTransportAvailable(transport, message) {
+        return chatServer.isTransportAvailable(userId, transport, message);
+      },
+      isTransportPreferred(transport, message) {
+        return chatServer.isTransportPreferred(userId, transport, message);
+      },
+      client() {
+        return options.connector;
+      },
+      get(value) {
+        return this.originalMessage[value];
+      }
     });
+    return onCreateMessage.call(chatServer, message);
   }
 
   function inboundMessage(payload, chatServer) {
@@ -243,13 +247,20 @@ const ChatExpress = function(options) {
         inbound: true
       },
       chat: function() {
-        return contextProvider.get(parsedMessage.chatId, parsedMessage.userId);
+        return contextProvider.get(
+          parsedMessage.chatId,
+          parsedMessage.userId,
+          { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+        );
       },
       api: function() {
         return chatServer;
       },
       client: function() {
         return chatServer.getOptions().connector;
+      },
+      get(value) {
+        return this.originalMessage[value];
       }
     };
     // create empty promise
@@ -259,15 +270,12 @@ const ChatExpress = function(options) {
     // if any context provider, then create the context
     if (contextProvider != null) {
       stack = stack
-        .then(function() {
-          return when(contextProvider.getOrCreate(parsedMessage.chatId, parsedMessage.userId, {
-            chatId: parsedMessage.chatId,
-            userId: parsedMessage.userId,
-            transport: parsedMessage.transport,
-            language: parsedMessage.language,
-            authorized: false
-          }));
-        })
+        .then(() => when(contextProvider.getOrCreate(
+          parsedMessage.chatId,
+          parsedMessage.userId,
+          { userId: parsedMessage.userId, transport: parsedMessage.transport, chatId: parsedMessage.chatId }
+        )))
+        .then(chatContext => when(chatContext.set({ language: parsedMessage.language, authorized: false, pending: false })))
         .then(function() {
           return when(message);
         });
@@ -738,7 +746,7 @@ const ChatExpress = function(options) {
         type,
         placeholder: config.placeholder,
         label: !_.isEmpty(config.label) ? config.label : name,
-        description: config.description,      
+        description: config.description,
         default: config.default,
         options: config.options
       });
@@ -905,9 +913,9 @@ const ChatExpress = function(options) {
             type,
             placeholder: config.placeholder,
             label: !_.isEmpty(config.label) ? config.label : name,
-            description: config.description,      
+            description: config.description,
             default: config.default,
-            options: config.options 
+            options: config.options
           });
           return this;
         };
@@ -1215,17 +1223,39 @@ ChatExpress.isValidFile = function(platform, type, file) {
   return null;
 };
 
+/**
+ * @method registerParam
+ * Register param for all transport/platforms
+ * @param {String} name
+ * @param {String} type Type of param
+ * @param {Object} config Params of the param, pun intended
+ * @chainable
+ */
+ChatExpress.registerParam = function(name, type, config = {}) {
+  if (name == null || typeof name !== 'string') {
+    throw 'Missing name in .registerParam()';
+  }
+  if (type == null || typeof type !== 'string') {
+    throw 'Missing type in .registerParam()';
+  }
+  if (_params.all == null) {
+    _params.all = [];
+  }
+  _params.all.push({
+    name,
+    type,
+    placeholder: config.placeholder,
+    label: !_.isEmpty(config.label) ? config.label : name,
+    description: config.description,
+    default: config.default,
+    options: config.options
+  });
+  return this;
+};
+
 ChatExpress.reset = function() {
   // reset global callbacks, will be re-registered with deploy
   _globalCallbacks = {};
 };
 
 module.exports = ChatExpress;
-
-
-
-
-
-
-
-

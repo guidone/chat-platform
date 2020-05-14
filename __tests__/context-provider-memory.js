@@ -200,27 +200,23 @@ describe('Chat context provider memory', () => {
   });
 
   it('should set some value with chatId and userId', () => {
-
     const provider = contextProviders.getProvider('memory');
-
-    return when(provider.getOrCreate(42, 44, {}))
+    return when(provider.getOrCreate(42, 44, { myVar: 123 }))
       .then(chatContext => chatContext.set('firstName', 'Guidone'))
-      .then(() => when(provider.get(42, null).get('firstName')))
+      .then(() => when(provider.get(null, 44).get('firstName')))
       .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => when(provider.get(null, 44)))
-
+      .then(() => when(provider.get(null, 44, { myVar: 123 })))
       .then(chatContext => {
-        console.log('firstName', chatContext);
         assert.equal(chatContext.get('firstName'), 'Guidone');
-        assert.equal(chatContext.get('userId'), 44);
+        assert.equal(chatContext.get('myVar'), 123);
       })
-      .then(() => when(provider.get(42, null).remove('firstName')))
-      .then(() => when(provider.get(42, null).get('firstName')))
-      .then(
+      .then(() => when(provider.get(null, 44).remove('firstName')))
+      .then(() => when(provider.get(null, 44).get('firstName')))
+      /*.then(
         () => {},
         firstName => {
           assert.isUndefined(firstName);
-        });
+        });*/
   });
 
 });

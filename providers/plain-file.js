@@ -81,17 +81,15 @@ const loadJson = file => {
 };
 
 
-const loadOrCreateIndex = ({ path }) => {
+const loadOrCreateIndex = async ({ path }) => {
   const indexPath = `${path}/index.json`;
-  return exists(indexPath)
-    .then(exists => {
-      if (!exists) {
-        let _index = { chatId: {}, userId: {} };
-        return writeJson(indexPath, _index);
-      } else {
-        return loadJson(indexPath);
-      }
-    });
+  const indexExists = await exists(indexPath);
+  if (!indexExists) {
+    let _index = { chatId: {}, userId: {} };
+    return writeJson(indexPath, _index);
+  } else {
+    return loadJson(indexPath);
+  }
 };
 
 const saveIndex = ({ path }) => {
@@ -100,25 +98,20 @@ const saveIndex = ({ path }) => {
 };
 
 
-const getOrLoadOrCreateIndex = ({ path }) => {
-  return new Promise(resolve => {
-    if (_index != null) {
-      resolve(_index);
-    } else {
-      loadOrCreateIndex({ path })
-        .then(index => {
-          _index = index;
-          resolve(index);
-        });
-    }
-  });
+const getOrLoadOrCreateIndex = async ({ path }) => {
+  if (_index != null) {
+    return _index;
+  } else {
+    _index = await loadOrCreateIndex({ path })
+    return _index;
+  }
 };
 
-const loadFileStore = (path, file) => {
+const loadFileStore = (path, file, statics) => {
   if (_store[file] != null) {
     return Promise.resolve(_store[file]);
   }
-  const store = new FileStore(null, `${path}/${file}`);
+  const store = new FileStore(null, `${path}/${file}`, statics);
   return store.load()
     .then(() => store);
 };
@@ -140,57 +133,53 @@ function FileFactory(params) {
   const { path } = params;
 
 
-  this.getOrCreate = function(chatId, userId = null, defaults) {
+  this.getOrCreate = async function(chatId, userId = null, statics = {}) {
     const { path } = params;
 
-    return new Promise((resolve, reject) => {
-      // get the index from the memory cache or from file, if doesn't exist create it
-      getOrLoadOrCreateIndex({ path })
-        .then(index => {
-          // if chatid or userid have a context, then loadit
-          if (chatId != null && index.chatId[chatId] != null) {
-            return loadFileStore(path, index.chatId[chatId])
-              .then(store => {
-                _store[index.chatId[chatId]] = store;
-                resolve(store);
-              });
-          } else if (userId != null && index.userId[userId] != null) {
-            return loadFileStore(path, index.userId[userId])
-              .then(store => {
-                _store[index.userId[userId]] = store;
-                resolve(store);
-              });
-          } else {
-            // file store doesn't exist yet, create one
-            const fileName = generateFileName(chatId, userId);
-            // store also userId if present
-            const store = new FileStore({ [userId != null ? 'userId' : null]: userId }, `${path}/${fileName}`);
-            // store in the index the file reference
-            if (chatId != null) {
-              index.chatId[chatId] = fileName;
-            }
-            if (userId != null) {
-              index.userId[userId] = fileName;
-            }
-            _store[fileName] = store;
-            // save index
-            return saveIndex({ path })
-              .then(() => store.set({ ...defaults, chatId})) // todo move this up?
-              .then(store => resolve(store), reject);
-          }
-        });
 
+    // get the index from the memory cache or from file, if doesn't exist create it
+    const index = await getOrLoadOrCreateIndex({ path })
 
-    }); // end promise
+    // if chatid or userid have a context, then loadit
+    if (userId != null && index.userId[userId] != null) {
+      console.log('trovato userid')
+      const store = await loadFileStore(path, index.userId[userId], statics)
+      _store[index.userId[userId]] = store;
+      return store;
+    } else if (chatId != null && index.chatId[chatId] != null) {
+      console.log('trovato chatid')
+      const store = await loadFileStore(path, index.chatId[chatId], statics);
+      _store[index.chatId[chatId]] = store;
+      return store;
+    } else {
+      // file store doesn't exist yet, create one
+      const fileName = generateFileName(chatId, userId);
+      // store also userId if present
+      const store = new FileStore({ [userId != null ? 'userId' : null]: userId }, `${path}/${fileName}`, statics);
+      // store in the index the file reference
+      if (chatId != null) {
+        index.chatId[chatId] = fileName;
+      }
+      if (userId != null) {
+        index.userId[userId] = fileName;
+      }
+      _store[fileName] = store;
+      // save index
+      await store.save();
+      await saveIndex({ path });
+
+      return store;
+    }
   };
 
-  this.get = function(chatId, userId) {
-    if (chatId != null && _index.chatId[chatId] != null) {
+  this.get = function(chatId, userId, statics = {}) {
+    /*if (chatId != null && _index.chatId[chatId] != null) {
       return _store[_index.chatId[chatId]];
     } else if (userId != null && _index.userId[userId] != null) {
       return _store[_index.userId[userId]];
     }
-    return null;
+    return null;*/
+    return this.getOrCreate(chatId, userId, statics);
   };
 
   return this;
@@ -223,13 +212,39 @@ _.extend(FileFactory.prototype, {
   }
 });
 
-function FileStore(defaults, file) {
+function FileStore(defaults, file, statics = {}) {
   this._context = _.clone(defaults || {});
   this._file = file;
+  // make sure userId is always a string
+  this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined });
+  if (_.isEmpty(statics)) {
+    console.trace('Warning: empty statics vars')
+  }
   return this;
 }
 _.extend(FileStore.prototype, {
-  get(key) {
+  async get(key) {
+    const keys = Array.from(arguments);
+    const payload = await this.getPayload();
+    if (keys.length === 1) {
+      if (this.statics[keys[0]] != null) {
+        return this.statics[keys[0]];
+      } else {
+        return payload[key] != null ? payload[key] : undefined;
+      }
+    }
+    const result = {};
+    keys.forEach(key => {
+      if (this.statics[key] != null) {
+        result[key] = this.statics[key];
+      } else {
+        result[key] = payload[key];
+      }
+    });
+    return result;
+  },
+
+  /*get(key) {
     const keys = Array.prototype.slice.call(arguments, 0);
     return new Promise((resolve, reject) => {
       this.load()
@@ -244,7 +259,7 @@ _.extend(FileStore.prototype, {
           reject
         );
     });
-  },
+  },*/
 
   parse(content) {
     let obj = null;
@@ -265,7 +280,21 @@ _.extend(FileStore.prototype, {
     return obj;
   },
 
+  getPayload() {
+    return new Promise((resolve, reject) => {
+      fs.readFile(this._file, (err, content) => {
+        if (err != null) {
+          reject(err);
+        } else {
+          this._context = this.parse(content);
+          resolve(this._context);
+        }
+      });
+    });
+  },
+
   load() {
+    console.log('carico', this._file)
     return new Promise((resolve, reject) => {
       fs.readFile(this._file, (err, content) => {
         if (err != null) {
@@ -298,7 +327,7 @@ _.extend(FileStore.prototype, {
     // add to a queue to prevent concurrent writing
     return filesQueue[this._file].add(saveTask);
   },
-  remove() {
+  /*remove() {
     const keys = _.clone(arguments);
     // eslint-disable-next-line no-undefined
     return new Promise((resolve, reject) => {
@@ -309,15 +338,51 @@ _.extend(FileStore.prototype, {
         })
         .then(resolve, reject);
     });
+  },*/
+  async remove() {
+    const keys = Array.from(arguments);
+    const payload = await this.getPayload();
+    keys.forEach(key => {
+      // eslint-disable-next-line prefer-reflect
+      delete payload[key];
+    });
+    await this.save();
+    return this;
   },
-  set(key, value) {
+
+  /*set(key, value) {
     if (_.isString(key)) {
       this._context[key] = value;
     } else if (_.isObject(key)) {
       _(key).each((value, key) => this._context[key] = value);
     }
     return this.save().then(() => this);
+  },*/
+  async set(key, value) {
+    let payload = await this.getPayload();
+    const staticKeys = Object.keys(this.statics);
+    if (_.isString(key) && staticKeys.includes(key)) {
+      console.log(`Warning: try to set a static key: ${key}`);
+    } else if (_.isObject(key) && _.intersection(staticKeys, Object.keys(key)).length !== 0) {
+      console.log(`Warning: try to set a static keys: ${_.intersection(staticKeys, Object.keys(key)).join(', ')}`);
+    }
+    // store values, skipping static keys
+    if (_.isString(key) && !staticKeys.includes(key)) {
+      payload[key] = value;
+    } else if (_.isObject(key)) {
+      Object.entries(key)
+        .forEach(([key, value]) => {
+          if (!staticKeys.includes(key)) {
+            payload[key] = value;
+          }
+        });
+    }
+    await this.save();
+    return this;
   },
+
+
+
   dump() {
     // eslint-disable-next-line no-console
     console.log(this._context);
@@ -332,4 +397,3 @@ _.extend(FileStore.prototype, {
 });
 
 module.exports = FileFactory;
-

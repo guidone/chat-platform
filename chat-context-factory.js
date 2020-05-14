@@ -2,6 +2,7 @@ const _ = require('underscore');
 
 const contextProviders = {};
 contextProviders.memory = require('./providers/memory');
+contextProviders.sqlite = require('./providers/sqlite');
 contextProviders['plain-file'] = require('./providers/plain-file');
 
 let _contexts = {};

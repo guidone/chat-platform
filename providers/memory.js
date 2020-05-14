@@ -4,62 +4,117 @@ const _storeUserIds = {};
 
 const isEmpty = value => value == null || value === '';
 
-function MemoryStore(defaults) {
-  this._context = _.clone(defaults || {});
+function MemoryStore(chatId, userId, statics = {}) {
+  this.chatId = chatId != null ? String(chatId) : null;
+  this.userId = userId != null ? String(userId) : null;
+  // make sure userId is always a string
+  this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
+  if (_.isEmpty(statics)) {
+    console.trace('Warning: empty statics vars')
+  }
   return this;
 }
 _.extend(MemoryStore.prototype, {
+  getPayload() {
+    // always precedence to userId
+    if (this.userId != null && _storeUserIds[this.userId] != null) {
+      return _storeUserIds[this.userId];
+    } else if (this.chatId != null && _store[this.chatId] != null) {
+      return _store[this.chatId];
+    } else if (this.userId != null) {
+      _storeUserIds[this.userId] = {};
+      return _storeUserIds[this.userId];
+    } else if (this.chatId != null) {
+      _store[this.chatId] = {};
+      return _store[this.chatId];
+    }
+    return {};
+  },
   get(key) {
-    const keys = Array.prototype.slice.call(arguments, 0);
+    const keys = Array.from(arguments);
+    const payload = this.getPayload();
+
     if (keys.length === 1) {
-      return this._context[key] != null ? this._context[key] : null;
+      if (this.statics[keys[0]] != null) {
+        return this.statics[keys[0]];
+      } else {
+        return payload[key] != null ? payload[key] : null;
+      }
     }
     const result = {};
-    _(keys).each(key => {
-      result[key] = this._context[key];
+    keys.forEach(key => {
+      if (this.statics[key] != null) {
+        result[key] = this.statics[key];
+      } else {
+        result[key] = payload[key];
+      }
     });
     return result;
   },
   remove() {
-    const keys = _.clone(arguments);
-    _(keys).each(key => {
+    const keys = Array.from(arguments);
+    const payload  = this.getPayload();
+    keys.forEach(key => {
       // eslint-disable-next-line prefer-reflect
-      delete this._context[key];
+      delete payload[key];
     });
     return this;
   },
   set(key, value) {
-    if (_.isString(key)) {
-      this._context[key] = value;
+    let payload = this.getPayload();
+    const staticKeys = Object.keys(this.statics);
+    if (_.isString(key) && staticKeys.includes(key)) {
+      console.log(`Warning: try to set a static key: ${key}`);
+    } else if (_.isObject(key) && _.intersection(staticKeys, Object.keys(key)).length !== 0) {
+      console.log(`Warning: try to set a static keys: ${_.intersection(staticKeys, Object.keys(key)).join(', ')}`);
+    }
+    // store values, skipping static keys
+    if (_.isString(key) && !staticKeys.includes(key)) {
+      payload[key] = value;
     } else if (_.isObject(key)) {
-      _(key).each((value, key) => {
-        this._context[key] = value;
-      });
+      payload = { ...payload, ..._.omit(key, staticKeys) };
+    }
+    // store the payload back
+    if (this.userId != null) {
+      _storeUserIds[this.userId] = payload;
+    } else if (this.chatId != null) {
+      _store[this.chatId] = payload;
     }
     return this;
   },
   dump() {
+    const payload = this.getPayload();
     // eslint-disable-next-line no-console
-    console.log(this._context);
+    console.log(payload);
   },
   all() {
-    return this._context != null ? this._context : {};
+    const payload = this.getPayload();
+    return payload;
   },
   clear() {
-    this._context = {};
+    if (this.userId != null) {
+      _storeUserIds[this.userId] = {};
+      _store[this.chatId] = null;
+    } else if (this.chatId != null) {
+      _store[this.chatId] = {};
+      _storeUserIds[this.userId] = null;
+    }
     return this;
   }
 });
 
 function MemoryFactory() {
 
-  this.getOrCreate = function(chatId, userId, defaults) {
+  this.getOrCreate = function(chatId, userId, statics) {
     if (isEmpty(chatId) && isEmpty(userId)) {
       return null;
     }
-    const chatContext = this.get(chatId, userId);
+    // just create an class that just wraps chatId and userId, add static value (cline)
+    const store = new MemoryStore(chatId, userId, { ...statics });
+    return store;
+    /*const chatContext = this.get(chatId, userId);
     if (chatContext == null) {
-      const memoryStore = new MemoryStore({ ... defaults, userId });
+      const memoryStore = new MemoryStore({ ...defaults });
       _store[chatId] = memoryStore;
       if (!isEmpty(userId)) {
         _storeUserIds[userId] = memoryStore;
@@ -67,14 +122,16 @@ function MemoryFactory() {
       return _store[chatId];
     }
     return chatContext;
+    */
   };
-  this.get = function(chatId, userId) {
-    if (!isEmpty(chatId) && _store[chatId] != null) {
+  this.get = function(chatId, userId, statics) {
+    /*if (!isEmpty(chatId) && _store[chatId] != null) {
       return _store[chatId];
     } else if (!isEmpty(userId) && _storeUserIds[userId] != null) {
       return _storeUserIds[userId];
     }
-    return null;
+    return null;*/
+    return new MemoryStore(chatId, userId, { ...statics });
   };
 
   return this;
@@ -85,7 +142,12 @@ _.extend(MemoryFactory.prototype, {
     + ' server is restarted all contexts are lost. It doesn\'t requires any parameters. Good for testing.',
   get: function(/*chatId, userId*/) {
   },
-  getOrCreate: function(/*chatId, userId, defaults*/) {
+  getOrCreate: function(/*chatId, userId, statics*/) {
+  },
+  assignToUser(userId, context) {
+    // when merging a user into another, this trasnfer the current context to another user
+    // TODO perhaps remove other occurence
+    _storeUserIds[userId] = context;
   },
   reset() {
     Object.keys(_store).forEach(key => delete _store[key]);
@@ -106,4 +168,3 @@ _.extend(MemoryFactory.prototype, {
 
 
 module.exports = MemoryFactory;
-

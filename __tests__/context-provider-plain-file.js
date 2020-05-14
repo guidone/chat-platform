@@ -32,7 +32,6 @@ describe('Chat context provider file', () => {
         assert.isFunction(chatContext.all);
         assert.isFunction(chatContext.remove);
         assert.isFunction(chatContext.clear);
-
         return chatContext.get('myVariable');
       }).then(myVariable => {
         assert.equal(myVariable, 'initial value');
@@ -40,151 +39,132 @@ describe('Chat context provider file', () => {
       });
   });
 
-  it('should set some value and then get and remove it', () => {
-
-    return when(provider.getOrCreate(42, null, {}))
-      .then(chatContext => chatContext.set('firstName', 'Guidone'))
-      .then(() =>when(provider.get(42).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => when(provider.get(42).remove('firstName')))
-      .then(() => when(provider.get(42).get('firstName')))
-      .then(firstName => assert.isUndefined(firstName));
+  it('should set some value and then get and remove it', async () => {
+    const chatContext = await provider.getOrCreate(42, null, {});
+    await chatContext.set('firstName', 'Guidone');
+    let firstName =await chatContext.get('firstName');
+    assert.equal(firstName, 'Guidone');
+    await chatContext.remove('firstName');
+    firstName = await chatContext.get('firstName');
+    assert.isUndefined(firstName);
   });
 
 
-  it('should set some values and then get and remove it', () => {
-
-    return when(provider.getOrCreate(42, null, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo'}))
-      .then(() => when(provider.get(42, null).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guido'))
-      .then(() => when(provider.get(42, null).get('lastName')))
-      .then(lastName => assert.equal(lastName, 'Bellomo'))
-      .then(() => when(provider.get(42, null).get('firstName', 'lastName')))
-      .then(json => {
-        assert.isObject(json);
-        assert.equal(json.firstName, 'Guido');
-        assert.equal(json.lastName, 'Bellomo');
-      });
+  it('should set some values and then get and remove it', async () => {
+    const chatContext = await provider.getOrCreate(42, null, {});
+    await chatContext.set({firstName: 'Guido', lastName: 'Bellomo'});
+    let firstName = await chatContext.get('firstName');
+    assert.equal(firstName, 'Guido');
+    let lastName = await chatContext.get('lastName');
+    assert.equal(lastName, 'Bellomo');
+    let json = await chatContext.get('firstName', 'lastName');
+    assert.isObject(json);
+    assert.equal(json.firstName, 'Guido');
+    assert.equal(json.lastName, 'Bellomo');
   });
 
-  it('should set some values and then get and remove it with userId', () => {
-
-    return when(provider.getOrCreate(null, 43, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo'}))
-      .then(() => when(provider.get(null, 43).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guido'))
-      .then(() => when(provider.get(null, 43).get('lastName')))
-      .then(lastName => assert.equal(lastName, 'Bellomo'))
-      .then(() => when(provider.get(null, 43).get('firstName', 'lastName')))
-      .then(json => {
-        assert.isObject(json);
-        assert.equal(json.firstName, 'Guido');
-        assert.equal(json.lastName, 'Bellomo');
-      });
+  it('should set some values and then get and remove it with userId', async () => {
+    const chatContext = await provider.getOrCreate(null, 43, {});
+    await chatContext.set({ firstName: 'Guido', lastName: 'Bellomo' });
+    let firstName = await chatContext.get('firstName');
+    assert.equal(firstName, 'Guido');
+    let lastName = await chatContext.get('lastName');
+    assert.equal(lastName, 'Bellomo');
+    let json = await chatContext.get('firstName', 'lastName');
+    assert.isObject(json);
+    assert.equal(json.firstName, 'Guido');
+    assert.equal(json.lastName, 'Bellomo');
   });
 
-  it('should set some values and get the dump with chatId', () => {
-
-    return when(provider.getOrCreate(42, null, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo', email: 'spam@gmail.com'}))
-      .then(() => when(provider.get(42).all()))
-      .then(json => {
-        assert.isObject(json);
-        assert.equal(json.firstName, 'Guido');
-        assert.equal(json.lastName, 'Bellomo');
-        assert.equal(json.email, 'spam@gmail.com');
-      });
+  it('should set some values and get the dump with chatId', async () => {
+    const chatContext = await provider.getOrCreate(42, null, {});
+    await chatContext.set({firstName: 'Guido', lastName: 'Bellomo', email: 'spam@gmail.com'});
+    const json = await chatContext.all();
+    assert.isObject(json);
+    assert.equal(json.firstName, 'Guido');
+    assert.equal(json.lastName, 'Bellomo');
+    assert.equal(json.email, 'spam@gmail.com');
   });
 
-  it('should set some values and get the dump with userId', () => {
-    return when(provider.getOrCreate(null, 43, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo', email: 'spam@gmail.com'}))
-      .then(() => when(provider.get(null, 43).all()))
-      .then(json => {
-        assert.isObject(json);
-        assert.equal(json.firstName, 'Guido');
-        assert.equal(json.lastName, 'Bellomo');
-        assert.equal(json.email, 'spam@gmail.com');
-      });
+  it('should set some values and get the dump with userId', async () => {
+    const chatContext = await provider.getOrCreate(null, 43, {});
+    await chatContext.set({firstName: 'Guido', lastName: 'Bellomo', email: 'spam@gmail.com'});
+    const json = await chatContext.all();
+    assert.isObject(json);
+    assert.equal(json.firstName, 'Guido');
+    assert.equal(json.lastName, 'Bellomo');
+    assert.equal(json.email, 'spam@gmail.com');
   });
 
-  it('should set some values and remove all for chatId', function() {
-    return when(provider.getOrCreate(42, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo'}))
-      .then(() => when(provider.get(42).clear()))
-      .then(() => when(provider.get(42).get('firstName')))
-      .then(firstName => assert.isUndefined(firstName))
-      .then(() => when(provider.get(42).get('lastName')))
-      .then(lastName => assert.isUndefined(lastName))
-      .then(() =>when(provider.get(42).all()))
-      .then(json => {
-        assert.isObject(json);
-        assert.isTrue(_.isEmpty(json));
-      });
+  it('should set some values and remove all for chatId', async () => {
+    const chatContext = await provider.getOrCreate(42, {});
+    await chatContext.set({firstName: 'Guido', lastName: 'Bellomo'});
+    await chatContext.clear();
+    let firstName = await chatContext.get('firstName');
+    assert.isUndefined(firstName);
+    let lastName = await chatContext.get('lastName');
+    assert.isUndefined(lastName);
+    const json = await chatContext.all();
+    assert.isObject(json);
+    assert.isTrue(_.isEmpty(json));
   });
 
-  it('should set some values and remove all for userId', () => {
-    return when(provider.getOrCreate(null, 43,  {}))
-      .then(chatContext => chatContext.set({firstName: 'Guido', lastName: 'Bellomo'}))
-      .then(() => when(provider.get(null, 43).clear()))
-      .then(() => when(provider.get(null, 43).get('firstName')))
-      .then(firstName => assert.isUndefined(firstName))
-      .then(() => when(provider.get(null, 43).get('lastName')))
-      .then(lastName => assert.isUndefined(lastName))
-      .then(() =>when(provider.get(null, 43).all()))
-      .then(json => {
-        assert.isObject(json);
-        assert.isTrue(_.isEmpty(json));
-      });
+  it('should set some values and remove all for userId', async () => {
+    const chatContext = await provider.getOrCreate(null, 43,  {});
+    await chatContext.set({firstName: 'Guido', lastName: 'Bellomo'});
+    await chatContext.clear();
+    const firstName = await chatContext.get('firstName');
+    assert.isUndefined(firstName)
+    const lastName = await chatContext.get('lastName');
+    assert.isUndefined(lastName)
+    const json = await chatContext.all();
+    assert.isObject(json);
+    assert.isTrue(_.isEmpty(json));
   });
 
-  it('should set some value the remove with multiple arguments for chatId', () => {
-    return when(provider.getOrCreate(42, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guidone', lastName: 'Bellomo', email: 'some@email'}))
-      .then(() => when(provider.get(42).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => when(provider.get(42).remove('firstName', 'lastName', 'email')))
-      .then(() => when(provider.get(42).all()))
-      .then(json => {
-        assert.isUndefined(json.firstName);
-        assert.isUndefined(json.lastName);
-        assert.isUndefined(json.email);
-      });
+  it('should set some value the remove with multiple arguments for chatId', async () => {
+    const chatContext = await provider.getOrCreate(42, {});
+    await chatContext.set({firstName: 'Guidone', lastName: 'Bellomo', email: 'some@email'})
+    const firstName = await chatContext.get('firstName');
+    assert.equal(firstName, 'Guidone');
+    await chatContext.remove('firstName', 'lastName', 'email');
+    const json = await chatContext.all();
+    assert.isUndefined(json.firstName);
+    assert.isUndefined(json.lastName);
+    assert.isUndefined(json.email);
   });
 
-  it('should set some value the remove with multiple arguments for userId', () => {
-    return when(provider.getOrCreate(null, 43, {}))
-      .then(chatContext => chatContext.set({firstName: 'Guidone', lastName: 'Bellomo', email: 'some@email'}))
-      .then(() => when(provider.get(null, 43).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => when(provider.get(null, 43).remove('firstName', 'lastName', 'email')))
-      .then(() => when(provider.get(null, 43).all()))
-      .then(json => {
-        assert.isUndefined(json.firstName);
-        assert.isUndefined(json.lastName);
-        assert.isUndefined(json.email);
-      });
+  it('should set some value the remove with multiple arguments for userId', async () => {
+    const chatContext = await provider.getOrCreate(null, 43, {});
+    await chatContext.set({firstName: 'Guidone', lastName: 'Bellomo', email: 'some@email'});
+    const firstName = await chatContext.get('firstName');
+    assert.equal(firstName, 'Guidone');
+    await chatContext.remove('firstName', 'lastName', 'email');
+    const json = await chatContext.all();
+    assert.isUndefined(json.firstName);
+    assert.isUndefined(json.lastName);
+    assert.isUndefined(json.email);
   });
 
-  it('should set some value with chatId and userId', () => {
-    return when(provider.getOrCreate(42, 44, {}))
-      .then(chatContext => chatContext.set('firstName', 'Guidone'))
-      .then(() => when(provider.get(42, null).get('firstName')))
-      .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => provider.get(42, null).get('userId'))
-      .then(userId => assert.equal(userId, 44))
-      .then(() => provider.get(42, null).get('chatId'))
-      .then(chatId => assert.equal(chatId, 42))
-      .then(() => provider.get(null, 44).get('firstName'))
-      .then(firstName => assert.equal(firstName, 'Guidone'))
-      .then(() => provider.get(null, 44).get('userId'))
-      .then(userId => assert.equal(userId, 44))
-      .then(() => provider.get(null, 44).get('chatId'))
-      .then(chatId => assert.equal(chatId, 42))
-      .then(() => when(provider.get(42, null).remove('firstName')))
-      .then(() => when(provider.get(42, null).get('firstName')))
-      .then(() => {}, firstName => assert.isUndefined(firstName));
+  it    ('should set some value with chatId and userId', async () => {
+    const chatContext = await provider.getOrCreate(42, 44, { userId: 44, chatId: 42 });
+    await chatContext.set('firstName', 'Guidone');
+    let firstName = await chatContext.get('firstName');
+    assert.equal(firstName, 'Guidone');
+    let userId = await chatContext.get('userId');
+    assert.equal(userId, 44);
+    let chatId = await chatContext.get('chatId');
+    assert.equal(chatId, 42);
+    const chatContext2 = await provider.getOrCreate(null, 44, { userId: 44, chatId: 42 });
+    firstName = await chatContext2.get('firstName');
+    assert.equal(firstName, 'Guidone');
+    userId = await chatContext2.get('userId');
+    assert.equal(userId, 44);
+    chatId = await chatContext2.get('chatId');
+    assert.equal(chatId, 42);
+    await chatContext2.remove('firstName');
+    firstName = await chatContext2.get('firstName');
+    assert.isUndefined(firstName);
   });
 
 });
