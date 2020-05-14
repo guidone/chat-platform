@@ -41,9 +41,9 @@ function SQLiteFactory(params) {
   });
 
   const Context = sequelize.define('context', {
-    userId: { type: Sequelize.STRING, allowNull: false },
-    chatId: { type: Sequelize.STRING, allowNull: false },
-    payload: { type: Sequelize.STRING, allowNull: false }
+    userId: { type: Sequelize.STRING },
+    chatId: { type: Sequelize.STRING },
+    payload: { type: Sequelize.STRING }
   }, {
     indexes: [
       { name: 'chatid_userid', using: 'BTREE', fields: ['userId'] },
@@ -177,6 +177,14 @@ function SQLiteFactory(params) {
   };
   this.reset = async () => {
     await Context.destroy({ where: {} });
+  };
+  this.drop = async () => {
+    await sequelize.query(
+      `DROP TABLE "contexts";
+      DROP INDEX "chatid_userid";
+      DROP INDEX "chatid_chatid";`,
+      { type: QueryTypes.SELECT }
+    );
   };
   this.start = async () => {
     /*

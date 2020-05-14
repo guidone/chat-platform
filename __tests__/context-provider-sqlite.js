@@ -12,6 +12,16 @@ describe('Chat context provider sqlite', () => {
 
   const getProvider = () => contextProviders.getProvider('sqlite', { dbPath: __dirname + '/dummy/mission-control.sqlite' });
 
+  beforeAll(async () => {
+    const provider = getProvider();
+    await provider.start();
+  });
+
+  afterAll(async () => {
+    const provider = getProvider();
+    await provider.drop();
+  });
+
   beforeEach(async () => {
     const provider = getProvider();
     await provider.reset();
