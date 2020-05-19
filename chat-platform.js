@@ -114,6 +114,9 @@ const ChatExpress = function(options) {
     evaluateParam(payload, 'ts', 'tsKey', chatServer);
     evaluateParam(payload, 'type', 'type', chatServer);
     evaluateParam(payload, 'language', 'language', chatServer);
+    // default userId on chatId, never leave it blank, pay attention
+    // on removing this constraint (some chat context may be lost)
+    payload.userId = !_.isEmpty(payload.userId) ? payload.userId : payload.chatId;
     // evaluate callbacks
     var callbacks = chatServer.getCallbacks();
     _(['chatId', 'userId', 'ts', 'type', 'language', 'messageId']).each(function(callbackName) {

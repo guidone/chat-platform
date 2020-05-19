@@ -1,36 +1,34 @@
-var _ = require('underscore');
-var moment = require('moment');
-var assert = require('chai').assert;
-var RED = require('../lib/red-stub')();
-var ChatExpress = require('../chat-platform');
-var Universal = require('../universal');
-var ContextProviders = require('../chat-context-factory');
-var os = require('os');
-var fs = require('fs');
-var utils = require('../lib/utils');
-var when = utils.when;
-var EventEmitter = require('events').EventEmitter;
-var inherits = require('util').inherits;
-
-var contextProviders = ContextProviders(RED);
+const moment = require('moment');
+const assert = require('chai').assert;
+const RED = require('../lib/red-stub')();
+const ChatExpress = require('../chat-platform');
+const ContextProviders = require('../chat-context-factory');
+const EventEmitter = require('events').EventEmitter;
+const inherits = require('util').inherits;
+const contextProviders = ContextProviders(RED);
 
 
-var Connector = function() {
-  var _this = this;
-  this.send = function(message) {
-    _this.emit('message', message);
-  };
+const Connector = function() {
+  this.send = message => this.emit('message', message);
   return this;
 };
 inherits(Connector, EventEmitter);
-var connector = new Connector();
+const connector = new Connector();
 
 
-describe('Chat platform framework', function() {
+const promisify = (chatServer, payload) => new Promise(
+  resolve => {
+    chatServer.on('start', () => connector.send(payload));
+    chatServer.on('message', message => resolve(message));
+    chatServer.start();
+  }
+);
 
-  it('should create a simple platform and retain options', function() {
+describe('Chat platform framework', () => {
 
-    var GenericPlatform = new ChatExpress({
+  it('should create a simple platform and retain options', async () => {
+
+    const GenericPlatform = new ChatExpress({
       optionKey1: 'value1',
       chatIdKey: 'myChatIdKey',
       userIdKey: 'myUserIdKey',
@@ -39,7 +37,7 @@ describe('Chat platform framework', function() {
       connector: connector,
       debug: false
     });
-    var chatServer = GenericPlatform.createServer({
+    const chatServer = GenericPlatform.createServer({
       optionKey2: 'value2',
       contextProvider: contextProviders.getProvider('memory')
     });
@@ -47,101 +45,78 @@ describe('Chat platform framework', function() {
     assert.equal(chatServer.getOptions().optionKey1, 'value1');
     assert.equal(chatServer.getOptions().optionKey2, 'value2');
 
-    return new Promise(function(resolve) {
-      chatServer.on('start', function() {
-        connector.send({
-          myChatIdKey: '52',
-          myUserIdKey: '62',
-          type: 'a_kind_of_magic'
-        });
-      });
-      chatServer.on('message', function(message) {
-        assert.equal(message.originalMessage.myChatIdKey, '52');
-        assert.equal(message.originalMessage.chatId, '52');
-        assert.equal(message.originalMessage.myUserIdKey, '62');
-        assert.equal(message.originalMessage.userId, '62');
-        assert.equal(message.originalMessage.transport, 'generic');
-        assert.equal(message.originalMessage.type, 'a_kind_of_magic');
-        assert.equal(message.payload.type, 'a_kind_of_magic');
-        assert.equal(message.payload.chatId, '52');
-        assert.equal(message.payload.userId, '62');
-        assert.equal(message.payload.inbound, true);
-        assert.equal(message.payload.transport, 'generic');
-        assert.isFunction(message.chat);
-        const variables = message.chat().all();
-        assert.equal(variables.pending, false);
-        assert.equal(variables.authorized, false);
-        assert.equal(variables.authorized, false);
-        const chatContext = message.chat();
-        assert.equal(chatContext.get('transport'), 'generic');
-        assert.equal(chatContext.get('chatId'), '52');
-        assert.equal(chatContext.get('userId'), '62');
-        resolve();
-      });
-      chatServer.start();
+    const message = await promisify(chatServer, {
+      myChatIdKey: '52',
+      myUserIdKey: '62',
+      type: 'a_kind_of_magic'
     });
+
+    assert.equal(message.originalMessage.myChatIdKey, '52');
+    assert.equal(message.originalMessage.chatId, '52');
+    assert.equal(message.originalMessage.myUserIdKey, '62');
+    assert.equal(message.originalMessage.userId, '62');
+    assert.equal(message.originalMessage.transport, 'generic');
+    assert.equal(message.originalMessage.type, 'a_kind_of_magic');
+    assert.equal(message.payload.type, 'a_kind_of_magic');
+    assert.equal(message.payload.chatId, '52');
+    assert.equal(message.payload.userId, '62');
+    assert.equal(message.payload.inbound, true);
+    assert.equal(message.payload.transport, 'generic');
+    assert.isFunction(message.chat);
+    const variables = message.chat().all();
+    assert.equal(variables.pending, false);
+    assert.equal(variables.authorized, false);
+    assert.equal(variables.authorized, false);
+    const chatContext = message.chat();
+    assert.equal(chatContext.get('transport'), 'generic');
+    assert.equal(chatContext.get('chatId'), '52');
+    assert.equal(chatContext.get('userId'), '62');
+
   });
 
-  it('should create a simple platform with callbacks', function() {
-
-    var GenericPlatform = new ChatExpress({
-      chatIdKey: function(payload) {
-        return payload.myChatIdKey;
-      },
-      userIdKey: function(payload) {
-        return payload.myUserIdKey;
-      },
-      type: function(payload) {
-        return payload.type;
-      },
-      tsKey: function(payload) {
-        return moment();
-      },
+  it('should create a simple platform with callbacks', async () => {
+    const GenericPlatform = new ChatExpress({
+      chatIdKey: payload => payload.myChatIdKey,
+      userIdKey: payload => payload.myUserIdKey,
+      type: payload => payload.type,
+      tsKey: () => moment(),
       transport: 'generic',
       inboundMessageEvent: 'message',
       connector: connector,
       debug: false
     });
-    var chatServer = GenericPlatform.createServer({
+    const chatServer = GenericPlatform.createServer({
       contextProvider: contextProviders.getProvider('memory')
     });
 
-    return new Promise(function(resolve) {
-      chatServer.on('start', function() {
-        connector.send({
-          myChatIdKey: '52',
-          myUserIdKey: '62',
-          type: 'a_kind_of_magic'
-        });
-      });
-      chatServer.on('message', function(message) {
-        assert.equal(message.originalMessage.myChatIdKey, '52');
-        assert.equal(message.originalMessage.myUserIdKey, '62');
-        assert.equal(message.originalMessage.type, 'a_kind_of_magic');
-        assert.equal(message.payload.type, 'a_kind_of_magic');
-        assert.equal(message.payload.chatId, '52');
-        assert.equal(message.payload.userId, '62');
-        assert.equal(message.payload.inbound, true);
-        assert.equal(message.payload.transport, 'generic');
-        assert.equal(message.payload.ts.isValid(), true);
-        assert.isFunction(message.chat);
-        const variables = message.chat().all();
-        assert.equal(variables.pending, false);
-        assert.equal(variables.authorized, false);
-        assert.equal(variables.authorized, false);
-        const chatContext = message.chat();
-        assert.equal(chatContext.get('transport'), 'generic');
-        assert.equal(chatContext.get('chatId'), '52');
-        assert.equal(chatContext.get('userId'), '62');
-        resolve();
-      });
-      chatServer.start();
+    const message = await promisify(chatServer, {
+      myChatIdKey: '52',
+      myUserIdKey: '62',
+      type: 'a_kind_of_magic'
     });
+
+    assert.equal(message.originalMessage.myChatIdKey, '52');
+    assert.equal(message.originalMessage.myUserIdKey, '62');
+    assert.equal(message.originalMessage.type, 'a_kind_of_magic');
+    assert.equal(message.payload.type, 'a_kind_of_magic');
+    assert.equal(message.payload.chatId, '52');
+    assert.equal(message.payload.userId, '62');
+    assert.equal(message.payload.inbound, true);
+    assert.equal(message.payload.transport, 'generic');
+    assert.equal(message.payload.ts.isValid(), true);
+    assert.isFunction(message.chat);
+    const variables = message.chat().all();
+    assert.equal(variables.pending, false);
+    assert.equal(variables.authorized, false);
+    assert.equal(variables.authorized, false);
+    const chatContext = message.chat();
+    assert.equal(chatContext.get('transport'), 'generic');
+    assert.equal(chatContext.get('chatId'), '52');
+    assert.equal(chatContext.get('userId'), '62');
   });
 
-  it('should create a platform with middlewares', function() {
-
-    var GenericPlatform = new ChatExpress({
+  it('should create a platform with middlewares', async () => {
+    const GenericPlatform = new ChatExpress({
       chatIdKey: 'myChatIdKey',
       userIdKey: 'myUserIdKey',
       transport: 'generic',
@@ -149,19 +124,19 @@ describe('Chat platform framework', function() {
       connector: connector,
       debug: false
     });
-    GenericPlatform.use(function(message) {
+    GenericPlatform.use(message => {
       message.payload.customKey = 'value';
       return message;
     });
-    GenericPlatform.in('a_kind_of_magic', function(message) {
+    GenericPlatform.in('a_kind_of_magic', message => {
       message.payload.customKey2 = 'value2';
       return message;
     });
-    GenericPlatform.in('another_type', function(message) {
+    GenericPlatform.in('another_type', message => {
       message.payload.customKey2 = 'value3';
       return message;
     });
-    GenericPlatform.in(function(message) {
+    GenericPlatform.in(message => {
       message.payload.customKey3 = 'value3';
       message.chat().set('customVar', 'ahaha');
       return message;
@@ -173,44 +148,76 @@ describe('Chat platform framework', function() {
     assert.isFalse(ChatExpress.isSupported('i_dont_exists'));
     assert.isFalse(ChatExpress.isSupported('generic', 'strange_type'));
 
-    var chatServer = GenericPlatform.createServer({
+    const chatServer = GenericPlatform.createServer({
       contextProvider: contextProviders.getProvider('memory')
     });
 
-    return new Promise(function(resolve) {
-      chatServer.on('start', function() {
-        connector.send({
-          myChatIdKey: '52',
-          myUserIdKey: '62',
-          type: 'a_kind_of_magic'
-        });
-      });
-      chatServer.on('message', function(message) {
-        assert.equal(message.originalMessage.myChatIdKey, '52');
-        assert.equal(message.originalMessage.myUserIdKey, '62');
-        assert.equal(message.originalMessage.type, 'a_kind_of_magic');
-        assert.equal(message.payload.type, 'a_kind_of_magic');
-        assert.equal(message.payload.chatId, '52');
-        assert.equal(message.payload.userId, '62');
-        assert.equal(message.payload.inbound, true);
-        assert.equal(message.payload.transport, 'generic');
-        assert.equal(message.payload.customKey, 'value');
-        assert.equal(message.payload.customKey2, 'value2');
-        assert.equal(message.payload.customKey3, 'value3');
-        assert.isFunction(message.chat);
-        const variables = message.chat().all();
-        assert.equal(variables.pending, false);
-        assert.equal(variables.authorized, false);
-        assert.equal(variables.authorized, false);
-        assert.equal(variables.customVar, 'ahaha');
-        const chatContext = message.chat();
-        assert.equal(chatContext.get('transport'), 'generic');
-        assert.equal(chatContext.get('chatId'), '52');
-        assert.equal(chatContext.get('userId'), '62');
-        resolve();
-      });
-      chatServer.start();
+    const message = await promisify(chatServer, {
+      myChatIdKey: '52',
+      myUserIdKey: '62',
+      type: 'a_kind_of_magic'
     });
+
+    assert.equal(message.originalMessage.myChatIdKey, '52');
+    assert.equal(message.originalMessage.myUserIdKey, '62');
+    assert.equal(message.originalMessage.type, 'a_kind_of_magic');
+    assert.equal(message.payload.type, 'a_kind_of_magic');
+    assert.equal(message.payload.chatId, '52');
+    assert.equal(message.payload.userId, '62');
+    assert.equal(message.payload.inbound, true);
+    assert.equal(message.payload.transport, 'generic');
+    assert.equal(message.payload.customKey, 'value');
+    assert.equal(message.payload.customKey2, 'value2');
+    assert.equal(message.payload.customKey3, 'value3');
+    assert.isFunction(message.chat);
+    const variables = message.chat().all();
+    assert.equal(variables.pending, false);
+    assert.equal(variables.authorized, false);
+    assert.equal(variables.authorized, false);
+    assert.equal(variables.customVar, 'ahaha');
+    const chatContext = message.chat();
+    assert.equal(chatContext.get('transport'), 'generic');
+    assert.equal(chatContext.get('chatId'), '52');
+    assert.equal(chatContext.get('userId'), '62');
+  });
+
+  it('should default userId on chatId', async () => {
+    const GenericPlatform = new ChatExpress({
+      chatIdKey: 'myChatIdKey',
+      userIdKey: 'myUserIdKey',
+      transport: 'generic',
+      inboundMessageEvent: 'message',
+      connector: connector,
+      debug: false
+    });
+    const chatServer = GenericPlatform.createServer({
+      contextProvider: contextProviders.getProvider('memory')
+    });
+
+    const message = await promisify(chatServer, {
+      myChatIdKey: '52',
+      type: 'a_kind_of_magic'
+    });
+
+    assert.equal(message.originalMessage.myChatIdKey, '52');
+    assert.equal(message.originalMessage.chatId, '52');
+    assert.equal(message.originalMessage.userId, '52');
+    assert.equal(message.originalMessage.transport, 'generic');
+    assert.equal(message.originalMessage.type, 'a_kind_of_magic');
+    assert.equal(message.payload.type, 'a_kind_of_magic');
+    assert.equal(message.payload.chatId, '52');
+    assert.equal(message.payload.userId, '52');
+    assert.equal(message.payload.inbound, true);
+    assert.equal(message.payload.transport, 'generic');
+    assert.isFunction(message.chat);
+    const variables = message.chat().all();
+    assert.equal(variables.pending, false);
+    assert.equal(variables.authorized, false);
+    assert.equal(variables.authorized, false);
+    const chatContext = message.chat();
+    assert.equal(chatContext.get('transport'), 'generic');
+    assert.equal(chatContext.get('chatId'), '52');
+    assert.equal(chatContext.get('userId'), '52');
   });
 
 });
