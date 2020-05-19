@@ -18,6 +18,10 @@ describe('Chat context provider file', () => {
     return provider.reset({ path });
   });
 
+  afterAll(() => {
+    return provider.reset({ path });
+  });
+
   it('should create a context provider with some default params', () => {
 
     assert.isTrue(contextProviders.hasProvider('plain-file'));
@@ -146,7 +150,7 @@ describe('Chat context provider file', () => {
     assert.isUndefined(json.email);
   });
 
-  it    ('should set some value with chatId and userId', async () => {
+  it('should set some value with chatId and userId', async () => {
     const chatContext = await provider.getOrCreate(42, 44, { userId: 44, chatId: 42 });
     await chatContext.set('firstName', 'Guidone');
     let firstName = await chatContext.get('firstName');
