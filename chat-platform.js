@@ -163,7 +163,7 @@ const ChatExpress = function(options) {
     const contextProvider = options.contextProvider;
     const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
-    console.log('creating', chatId, userId)
+
     const chatContext = await when(contextProvider.getOrCreate(chatId, userId, {
       chatId: chatId,
       userId: userId,

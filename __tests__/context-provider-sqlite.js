@@ -4,6 +4,7 @@ const fs = require('fs');
 const RED = require('../lib/red-stub')();
 const ContextProviders = require('../chat-context-factory');
 const { when } = require('../lib/utils');
+const os = require('os');
 
 const copyFile = (source, destination) => new Promise((resolve, reject) => {
   fs.copyFile(source, destination, error => {
@@ -23,6 +24,41 @@ const removeFile = file => new Promise((resolve, reject) => {
       resolve();
     }
   });
+});
+
+describe('Chat context provider sqlite - missing file', () => {
+  const contextProviders = ContextProviders(RED);
+  const path = os.tmpdir();
+  const getProvider = () => contextProviders.getProvider('sqlite', { dbPath: path + '/mission-control.sqlite' });
+
+  beforeAll(async () => {
+    const provider = getProvider();
+    await provider.start();
+  });
+
+  afterAll(async () => {
+    await removeFile(path + '/mission-control.sqlite');
+  });
+
+  it('should create a context provider with some default params with chatId', async () => {
+
+    assert.isTrue(contextProviders.hasProvider('sqlite'));
+    const provider = getProvider();
+    assert.isFunction(provider.getOrCreate);
+    assert.isFunction(provider.get);
+    const chatContext = await provider.getOrCreate(43, null, { chatId: 43 });
+    await chatContext.set({ myVariable: 'initial value' })
+    assert.isFunction(chatContext.get);
+    assert.isFunction(chatContext.set);
+    assert.isFunction(chatContext.all);
+    assert.isFunction(chatContext.remove);
+    assert.isFunction(chatContext.clear);
+    const myVariable = await  chatContext.get('myVariable');
+
+    assert.equal(myVariable, 'initial value');
+  });
+
+
 });
 
 
