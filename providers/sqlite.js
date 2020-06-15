@@ -26,11 +26,18 @@ function SQLiteStore(chatId, userId, statics = {}) {
 
 function SQLiteFactory(params) {
   params = params || {};
+  let fileCreatedAutomatically = false;
   if (_.isEmpty(params.dbPath)) {
     throw 'SQLite context provider: missing parameter "dbPath"';
   }
   if (!fs.existsSync(params.dbPath)) {
-    throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist';
+    //throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist';
+    try {
+      fs.copyFileSync(`${__dirname}/../blank/empty.sqlite`, params.dbPath);
+      fileCreatedAutomatically = true;
+    } catch(e) {
+      throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist and unable to create';
+    }
   }
 
   const sequelize = new Sequelize('mission_control', '', '', {
@@ -109,7 +116,10 @@ function SQLiteFactory(params) {
         // is and at some point the MC_store assign the context to the user
         context = contexts.find(context => context.userId === this.userId);
         if (context == null) {
-          contexts.find(context => context.chatId === this.chatId);
+          context = contexts.find(context => context.chatId === this.chatId);
+        }
+        if (context == null) {
+          context = contexts[0];
         }
         // finally decode
         try {
@@ -206,7 +216,8 @@ function SQLiteFactory(params) {
       }
       // then log, don't move, keep the log lines together
       console.log(lcd.timestamp() + 'SQLite context provider configuration:');
-      console.log(lcd.timestamp() + '  ' + lcd.green('dbPath: ') + lcd.grey(params.dbPath));
+      console.log(lcd.timestamp() + '  ' + lcd.green('dbPath: ') + lcd.grey(params.dbPath)
+        + (fileCreatedAutomatically ? ' - file was missing, empty one created automatically ' : ''));
       if (createTable) {
         console.log(lcd.timestamp() + '  ' + lcd.green('database: ') + lcd.grey('table missing, created successfully'));
       } else {
