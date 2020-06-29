@@ -539,6 +539,8 @@ const ChatExpress = function(options) {
         if (chatServer != null) {
           chatServer.emit('error', error);
         }
+        // rethrow error so it can be caught by the sender node
+        throw error;
       })
       .then(function(message) {
         return message;
