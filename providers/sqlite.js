@@ -13,12 +13,12 @@ const isEmpty = value => value == null || value === '';
 
 
 
-function SQLiteStore(chatId, userId, statics = {}) {
+function SQLiteStore(chatId, userId, statics = {}, warnings = false) {
   this.chatId = chatId != null ? String(chatId) : null;
   this.userId = userId != null ? String(userId) : null;
   // make sure userId is always a string
   this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
-  if (_.isEmpty(statics)) {
+  if (warnings && _.isEmpty(statics)) {
     console.trace('Warning: empty statics vars')
   }
   return this;
