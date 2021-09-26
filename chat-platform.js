@@ -592,7 +592,7 @@ const ChatExpress = function(options) {
         }
         if (RED.httpNode._router.stack.length >= routesCount) {
           // eslint-disable-next-line no-console
-          chatServer.error('improperly removed some routes, this will cause unexpected results and tricky bugs');
+          chatServer.warning(`Improperly removed some routes from Express. This is normal when multiple bots are running in the same server.`);
         }
       }
     }
@@ -784,6 +784,12 @@ const ChatExpress = function(options) {
           // eslint-disable-next-line no-console
           console.log(red(text));
           this.emit('error', text);
+        };
+        this.warning = function(msg) {
+          var text = '[' + options.transport.toUpperCase() + '] ' + msg;
+          // eslint-disable-next-line no-console
+          console.log(red(text));
+          this.emit('warning', text);
         };
         this.log = function(obj) {
           // eslint-disable-next-line no-console
