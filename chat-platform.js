@@ -596,7 +596,7 @@ const ChatExpress = function(options) {
         }
         if (RED.httpNode._router.stack.length >= routesCount) {
           // eslint-disable-next-line no-console
-          chatServer.warning(`Improperly removed some routes from Express. This is normal when multiple bots are running in the same server.`);
+          chatServer.warning('Improperly removed some routes from Express. This is normal when multiple bots are running in the same server.');
         }
       }
     }
