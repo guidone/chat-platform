@@ -44,6 +44,7 @@ const ChatExpress = function(options) {
     transportDescription: null,
     chatIdKey: null,
     userIdKey: null,
+    messageIdKey: null,
     tsKey: null,
     debug: true,
     onStart: null,
@@ -84,7 +85,7 @@ const ChatExpress = function(options) {
   }
 
   function evaluateParam(payload, newKey, optionKey, chatServer) {
-    var options = _this.options;
+    const options = _this.options;
     if (options[optionKey] != null) {
       if (_.isString(options[optionKey]) && newKey != options[optionKey]) {
         payload[newKey] = payload[options[optionKey]];
@@ -111,6 +112,7 @@ const ChatExpress = function(options) {
 
     evaluateParam(payload, 'chatId', 'chatIdKey', chatServer);
     evaluateParam(payload, 'userId', 'userIdKey', chatServer);
+    evaluateParam(payload, 'messageId', 'messageIdKey', chatServer);
     evaluateParam(payload, 'ts', 'tsKey', chatServer);
     evaluateParam(payload, 'type', 'type', chatServer);
     evaluateParam(payload, 'language', 'language', chatServer);
@@ -118,7 +120,7 @@ const ChatExpress = function(options) {
     // on removing this constraint (some chat context may be lost)
     payload.userId = !_.isEmpty(payload.userId) ? payload.userId : payload.chatId;
     // evaluate callbacks
-    var callbacks = chatServer.getCallbacks();
+    const callbacks = chatServer.getCallbacks();
     _(['chatId', 'userId', 'ts', 'type', 'language', 'messageId']).each(function(callbackName) {
       if (_.isFunction(callbacks[callbackName])) {
         payload[callbackName] = callbacks[callbackName].call(chatServer, payload)
@@ -424,9 +426,7 @@ const ChatExpress = function(options) {
     }
 
     // create empty promise
-    let stack = new Promise(function(resolve) {
-      resolve(message);
-    });
+    let stack = new Promise(resolve => resolve(message));
     // check for chatId, if not present check for userId-chatId translator, otherwise fail
     stack = stack.then(message => {
       const { transport } = instanceOptions;
@@ -533,6 +533,13 @@ const ChatExpress = function(options) {
     });
     // finally
     return stack
+      .then(function(message) {
+        // move the sent payload to the conventional key "sentMessage", it's up to middleware to
+        // update there the messageId
+        message.sentMessage = message.payload;
+        delete message.payload;
+        return message;
+      })
       .catch(function(error) {
         // eslint-disable-next-line no-console
         console.log(red(error));
@@ -541,9 +548,6 @@ const ChatExpress = function(options) {
         }
         // rethrow error so it can be caught by the sender node
         throw error;
-      })
-      .then(function(message) {
-        return message;
       });
   }
 
