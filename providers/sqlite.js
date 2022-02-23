@@ -114,8 +114,11 @@ function SQLiteFactory(params) {
         // if by any change there are two matched rows, one for the chatId and one for userId
         // always prefer the userId (that could happen if the user star using the sqlite provider) as
         // is and at some point the MC_store assign the context to the user
-        context = contexts.find(context => context.userId === this.userId);
-        if (context == null) {
+        if(this.userId != null)
+        {
+          context = contexts.find(context => context.userId === this.userId);
+        }
+        if (context == null && this.chatId != null) {
           context = contexts.find(context => context.chatId === this.chatId);
         }
         if (context == null) {
