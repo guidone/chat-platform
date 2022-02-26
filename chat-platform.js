@@ -215,7 +215,8 @@ const ChatExpress = function(options) {
   }
 
   function inboundMessage(payload, chatServer) {
-    var contextProvider = chatServer.getOptions().contextProvider;
+    const options = chatServer.getOptions();
+    const contextProvider = options.contextProvider;
     if (chatServer.isDebug()) {
       // eslint-disable-next-line no-console
       console.log(orange('-- INBOUND MESSAGE --'));
@@ -245,7 +246,8 @@ const ChatExpress = function(options) {
         messageId: parsedMessage.messageId,
         transport: parsedMessage.transport,
         language: parsedMessage.language,
-        ts: parsedMessage.ts
+        ts: parsedMessage.ts,
+        chatbotId: options.chatbotId
       }),
       payload: {
         type: parsedMessage.type,
