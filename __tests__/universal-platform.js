@@ -83,14 +83,14 @@ describe('Universal Connector', () => {
       })
     );
     // store the global resolver
-    chatServer.onGetChatIdFromUserId((userId, transport, message) => {
+    /*chatServer.onGetChatIdFromUserId((userId, transport, message) => {
       if (userId === '1234' && transport === 'universal') {
         return '42';
       } else if (userId === '1234' && transport === 'universal-alt') {
         return '43';
       }
       return null;
-    });
+    });*/
   });
 
   it('receive incoming message', () => {

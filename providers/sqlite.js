@@ -10,16 +10,16 @@ const Op = Sequelize.Op;
 
 const isEmpty = value => value == null || value === '';
 
-
-
-
-function SQLiteStore(chatId, userId, statics = {}, warnings = false) {
-  this.chatId = chatId != null ? String(chatId) : null;
+function SQLiteStore(userId, chatbotId, statics = {}, warnings = false) {
   this.userId = userId != null ? String(userId) : null;
+  this.chatbotId = chatbotId;
   // make sure userId is always a string
   this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
   if (warnings && _.isEmpty(statics)) {
-    console.trace('Warning: empty statics vars')
+    console.trace('Warning: empty statics vars');
+  }
+  if (warnings && _.isEmpty(chatbotId)) {
+    console.trace('Warning: empty chatbotId');
   }
   return this;
 }
@@ -30,6 +30,9 @@ function SQLiteFactory(params) {
   if (_.isEmpty(params.dbPath)) {
     throw 'SQLite context provider: missing parameter "dbPath"';
   }
+  if (_.isEmpty(params.chatbotId)) {
+    throw 'SQLite context provider: missing parameter "chatbotId"';
+  }
   if (!fs.existsSync(params.dbPath)) {
     //throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist';
     try {
@@ -39,6 +42,7 @@ function SQLiteFactory(params) {
       throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist and unable to create';
     }
   }
+  this.chatbotId = params.chatbotId;
 
   const sequelize = new Sequelize('mission_control', '', '', {
     host: 'localhost',
@@ -49,16 +53,28 @@ function SQLiteFactory(params) {
 
   const Context = sequelize.define('context', {
     userId: { type: Sequelize.STRING },
-    chatId: { type: Sequelize.STRING },
-    payload: { type: Sequelize.STRING }
+    payload: { type: Sequelize.STRING },
+    chatbotId: { type: Sequelize.STRING }
   }, {
     indexes: [
       { name: 'chatid_userid', using: 'BTREE', fields: ['userId'] },
-      { name: 'chatid_chatid', using: 'BTREE', fields: ['chatId'] }
+      { name: 'chatid_chatbotId', using: 'BTREE', fields: ['chatbotId'] }
     ]
   });
 
-
+  const ChatId = sequelize.define('chatid', {
+    userId: { type: Sequelize.STRING, allowNull: false },
+    chatId: { type: Sequelize.STRING, allowNull: false },
+    transport: { type: Sequelize.STRING, allowNull: false },
+    chatbotId: { type: Sequelize.TEXT }
+  }, {
+    indexes: [
+      { name: 'chatid_userid', using: 'BTREE', fields: ['userId'] },
+      { name: 'chatid_chatid', using: 'BTREE', fields: ['chatId'] },
+      { name: 'chatid_transport', using: 'BTREE', fields: ['transport'] },
+      { name: 'chatid_chatbotId', using: 'BTREE', fields: ['chatbotId'] }
+    ]
+  });
 
   // **
   // Start definition if SQLite store, with closure I can spare passing a Context as configuration
@@ -97,30 +113,14 @@ function SQLiteFactory(params) {
     },
 
     async getPayload() {
-      // get payload using chatId or userId
-      const contexts = await Context.findAll({ where: {
-        [Op.or]: [
-          { chatId: this.chatId },
-          { userId: this.userId }
-        ]
+      // get payload using userId (it generally defaults to chatId)
+      const context = await Context.findOne({ where: {
+        userId: this.userId,
+        chatbotId: this.chatbotId
       }});
-      let payload;
-      let context;
-      if (contexts.length === 0) {
-        // if not present then create the row
-        context = await Context.create({ payload: JSON.stringify({}), chatId: this.chatId, userId: this.userId });
-        payload = {};
-      } else {
-        // if by any change there are two matched rows, one for the chatId and one for userId
-        // always prefer the userId (that could happen if the user star using the sqlite provider) as
-        // is and at some point the MC_store assign the context to the user
-        context = contexts.find(context => context.userId === this.userId);
-        if (context == null) {
-          context = contexts.find(context => context.chatId === this.chatId);
-        }
-        if (context == null) {
-          context = contexts[0];
-        }
+
+      if (context != null) {
+        let payload;
         // finally decode
         try {
           payload = JSON.parse(context.payload);
@@ -128,8 +128,16 @@ function SQLiteFactory(params) {
           // default if error
           payload = {};
         }
+        return { payload, id: context.id };
+      } else {
+        // if not present then create the row
+        const context = await Context.create({
+          payload: JSON.stringify({}),
+          chatbotId: this.chatbotId,
+          userId: this.userId
+        });
+        return { payload: {}, id: context.id };
       }
-      return { payload, id: context.id };
     },
 
     async set(key, value) {
@@ -172,16 +180,63 @@ function SQLiteFactory(params) {
   // End definition if SQLite store
   // **
 
+  this.getOrCreateUserId = async function(chatId, transport) {
+    // try to find a userId given then chatId / transport for the current chatbot
+    const binding = await ChatId.findOne({
+      where: { chatId, transport, chatbotId: this.chatbotId }
+    });
+
+    if (binding != null) {
+      return binding.userId;
+    } else {
+      const userId = chatId;
+      await ChatId.create({ chatId, transport, chatbotId: this.chatbotId, userId });
+      return userId;
+    }
+  };
+
+  /**
+   * getUserId
+   * Get the userId from chatId, if doesn't exist, defaults to chatId
+   */
+  this.getUserId = async function(chatId, transport) {
+    const binding = await ChatId.findOne({
+      where: { chatId, transport, chatbotId: this.chatbotId }
+    });
+    return binding != null ? binding.userId : chatId;
+  };
+
+  this.getChatId = async function(userId, transport) {
+    const binding = await ChatId.findOne({
+      where: { userId, transport, chatbotId: this.chatbotId }
+    });
+    return binding != null ? binding.chatId : null;
+  };
+
+  this.getOrCreateContext = async function(userId, statics) {
+    if (isEmpty(userId)) {
+      return null;
+    }
+    // just create an class that just wraps userId, chatbotId and static value (cline)
+    const store = new SQLiteStore(userId, this.chatbotId, { ...statics });
+    return store;
+  };
+
+
   this.getOrCreate = async function(chatId, userId, statics) {
     if (isEmpty(chatId) && isEmpty(userId)) {
       return null;
     }
-    // just create an class that just wraps chatId and userId, add static value (cline)
-    const store = new SQLiteStore(chatId, userId, { ...statics });
+    // just create an class that just wraps userId, chatbotId and static value (cline)
+    const store = new SQLiteStore(userId, this.chatbotId, { ...statics });
     return store;
   };
   this.get = function(chatId, userId, statics) {
-    return new SQLiteStore(chatId, userId, statics);
+    console.warn('This is deprectated, use getContext instead')
+    return new SQLiteStore(userId, this.chatbotId, statics);
+  };
+  this.getContext = function(userId, statics) {
+    return new SQLiteStore(userId, this.chatbotId, statics);
   };
   this.assignToUser = async (userId, context) => {
   };
@@ -262,6 +317,5 @@ _.extend(SQLiteFactory.prototype, {
     });
   }
 });
-
 
 module.exports = SQLiteFactory;

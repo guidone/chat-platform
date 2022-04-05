@@ -2,7 +2,7 @@ const _ = require('underscore');
 const _s = require('underscore.string');
 const clc = require('cli-color');
 const prettyjson = require('prettyjson');
-const { isEmpty, when } = require('./lib/utils');
+const { when } = require('./lib/utils');
 const EventEmitter = require('events').EventEmitter;
 const inherits = require('util').inherits;
 const lcd = require('./helpers/lcd');
@@ -96,8 +96,9 @@ const ChatExpress = function(options) {
     }
   }
 
-  function parseMessage(payload, options, chatServer) {
-    var instanceOptions = chatServer.getOptions();
+  async function parseMessage(payload, options, chatServer) {
+    const instanceOptions = chatServer.getOptions();
+    const { contextProvider, transport } = instanceOptions;
 
     payload = _.clone(payload);
     // sets inbound
@@ -111,21 +112,27 @@ const ChatExpress = function(options) {
     }
 
     evaluateParam(payload, 'chatId', 'chatIdKey', chatServer);
-    evaluateParam(payload, 'userId', 'userIdKey', chatServer);
     evaluateParam(payload, 'messageId', 'messageIdKey', chatServer);
     evaluateParam(payload, 'ts', 'tsKey', chatServer);
     evaluateParam(payload, 'type', 'type', chatServer);
     evaluateParam(payload, 'language', 'language', chatServer);
-    // default userId on chatId, never leave it blank, pay attention
-    // on removing this constraint (some chat context may be lost)
-    payload.userId = !_.isEmpty(payload.userId) ? payload.userId : payload.chatId;
+    evaluateParam(payload, 'userId', 'userIdKey', chatServer);
+
+    // get the userId from chatId, ask the context provider to create one and to create
+    // the bindings between chatId <-> transport <-> userId
+    payload.userId = await contextProvider.getOrCreateUserId(
+      String(payload.chatId),
+      transport
+    );
+
     // evaluate callbacks
     const callbacks = chatServer.getCallbacks();
-    _(['chatId', 'userId', 'ts', 'type', 'language', 'messageId']).each(function(callbackName) {
+    _(['chatId', /*'userId',*/ 'ts', 'type', 'language', 'messageId']).each(function(callbackName) {
       if (_.isFunction(callbacks[callbackName])) {
         payload[callbackName] = callbacks[callbackName].call(chatServer, payload)
       }
     });
+
     // at this point should have at least the values chatId and type
     if (payload.chatId == null && !options.relaxChatId) {
       throw 'Error: inbound message key "chatId" for transport ' + _this.options.transport + ' is empty\n\n'
@@ -166,11 +173,30 @@ const ChatExpress = function(options) {
     const onCreateMessage = _.isFunction(options.onCreateMessage) ? options.onCreateMessage : identity;
     inboudMessage = inboudMessage || {};
 
-    const chatContext = await when(contextProvider.getOrCreate(chatId, userId, {
-      chatId: chatId,
-      userId: userId,
+    if (_.isEmpty(userId) && _.isEmpty(chatId)) {
+      throw 'Both userId and chatId empty, cannot start a conversation';
+    }
+    // get the context finding the userId given chatId, chatbotId and transport
+    if (_.isEmpty(userId) && !_.isEmpty(chatId)) {
+      userId = await contextProvider.getUserId(chatId, options.transport);
+      if (_.isEmpty(userId)) {
+        throw `Unable to resolve userId from chatId "${chatId}" (${options.transport})`;
+      }
+    }
+    if (_.isEmpty(chatId) && !_.isEmpty(userId)) {
+      chatId = await contextProvider.getChatId(userId, options.transport);
+      if (_.isEmpty(chatId)) {
+        throw `Unable to resolve chatId from userId "${userId}" (${options.transport}). That means either the userId "${userId}" doesn't exist or it's not possible to find a valid chatId for the platform ${options.transport}.`;
+      }
+    }
+
+    const chatContext = await contextProvider.getOrCreateContext(userId, {
+      chatId,
+      userId,
       transport: options.transport,
-      }));
+      chatbotId: options.chatbotId
+    });
+
     await chatContext.set({
       authorized: false,
       pending: false,
@@ -180,13 +206,13 @@ const ChatExpress = function(options) {
       originalMessage: {
         chatId: chatId,
         userId: userId,
+        chatbotId: options.chatbotId,
         messageId: messageId,
         transport: options.transport,
         language: null
       },
       chat() {
-        return contextProvider.get(
-          chatId,
+        return contextProvider.getContext(
           userId,
           {
             userId: this.originalMessage.userId,
@@ -214,7 +240,7 @@ const ChatExpress = function(options) {
     return onCreateMessage.call(chatServer, message);
   }
 
-  function inboundMessage(payload, chatServer) {
+  async function inboundMessage(payload, chatServer) {
     const options = chatServer.getOptions();
     const contextProvider = options.contextProvider;
     if (chatServer.isDebug()) {
@@ -233,7 +259,7 @@ const ChatExpress = function(options) {
     // parse the message to extract the minimum payload needed for chat-platform to work properly
     // could raise errors, relay to chat server
     try {
-      var parsedMessage = parseMessage(payload, _this.options, chatServer);
+      var parsedMessage = await parseMessage(payload, _this.options, chatServer);
     } catch(e) {
       chatServer.emit('error', e);
       return;
@@ -258,10 +284,13 @@ const ChatExpress = function(options) {
         inbound: true
       },
       chat: function() {
-        return contextProvider.get(
-          parsedMessage.chatId,
+        return contextProvider.getContext(
           parsedMessage.userId,
-          { userId: this.originalMessage.userId, transport: this.originalMessage.transport, chatId: this.originalMessage.chatId }
+          {
+            userId: this.originalMessage.userId,
+            transport: this.originalMessage.transport,
+            chatId: this.originalMessage.chatId
+          }
         );
       },
       api: function() {
@@ -281,15 +310,20 @@ const ChatExpress = function(options) {
     // if any context provider, then create the context
     if (contextProvider != null) {
       stack = stack
-        .then(() => when(contextProvider.getOrCreate(
-          parsedMessage.chatId,
+        .then(() => contextProvider.getOrCreateContext(
           parsedMessage.userId,
-          { userId: parsedMessage.userId, transport: parsedMessage.transport, chatId: parsedMessage.chatId }
-        )))
-        .then(chatContext => when(chatContext.set({ language: parsedMessage.language, authorized: false, pending: false })))
-        .then(function() {
-          return when(message);
-        });
+          {
+            userId: parsedMessage.userId,
+            transport: parsedMessage.transport,
+            chatId: parsedMessage.chatId
+          }
+        ))
+        .then(chatContext => when(chatContext.set({
+          language: parsedMessage.language,
+          authorized: false,
+          pending: false
+        })))
+        .then(() => when(message));
     } else {
       // eslint-disable-next-line no-console
       console.log(yellow('WARNING: context provider was not specified'));
@@ -406,18 +440,6 @@ const ChatExpress = function(options) {
       return;
     }
 
-    const instanceOptions = chatServer.getOptions();
-    // check if the message is from the right platform (in static class or instance)
-    /*if (message.originalMessage != null && message.originalMessage.transport !== _this.options.transport &&
-      message.originalMessage.transport !== instanceOptions.transport) {
-      // exit, it's not from the current platform
-      if (chatServer.isDebug()) {
-        // eslint-disable-next-line no-console
-        console.log(yellow('Skipped incoming message for platform: ' + message.originalMessage.transport));
-      }
-      return;
-    }*/
-
     if (chatServer.isDebug()) {
       // eslint-disable-next-line no-console
       console.log(orange('-- OUTBOUND MESSAGE --'));
@@ -429,7 +451,10 @@ const ChatExpress = function(options) {
 
     // create empty promise
     let stack = new Promise(resolve => resolve(message));
+    // TODO remove this, chatId must be resolved in a different place
     // check for chatId, if not present check for userId-chatId translator, otherwise fail
+
+    /*
     stack = stack.then(message => {
       const { transport } = instanceOptions;
       if (!isEmpty(message.payload.chatId)) {
@@ -479,6 +504,8 @@ const ChatExpress = function(options) {
       }
       return message;
     });
+    */
+
     // run general middleware
     _(_this.uses.concat(chatServer.getUseMiddleWares())).each(function(filter) {
       stack = stack.then(function(message) {
