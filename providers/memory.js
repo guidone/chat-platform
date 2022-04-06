@@ -1,11 +1,13 @@
 const _ = require('underscore');
-const _store = {};
-const _storeUserIds = {};
 
 const isEmpty = value => value == null || value === '';
 
-function MemoryStore(chatId, userId, statics = {}, warnings = false) {
-  this.chatId = chatId != null ? String(chatId) : null;
+const _storeChatIds = {};
+const _storeUserIds = {};
+const _store = {};
+
+function MemoryStore(userId, statics = {}, warnings = false) {
+  //this.chatId = chatId != null ? String(chatId) : null;
   this.userId = userId != null ? String(userId) : null;
   // make sure userId is always a string
   this.statics = Object.assign({}, statics, { userId: statics.userId != null ? String(statics.userId) : undefined  });
@@ -14,19 +16,15 @@ function MemoryStore(chatId, userId, statics = {}, warnings = false) {
   }
   return this;
 }
+
 _.extend(MemoryStore.prototype, {
   getPayload() {
     // always precedence to userId
     if (this.userId != null && _storeUserIds[this.userId] != null) {
       return _storeUserIds[this.userId];
-    } else if (this.chatId != null && _store[this.chatId] != null) {
-      return _store[this.chatId];
     } else if (this.userId != null) {
       _storeUserIds[this.userId] = {};
       return _storeUserIds[this.userId];
-    } else if (this.chatId != null) {
-      _store[this.chatId] = {};
-      return _store[this.chatId];
     }
     return {};
   },
@@ -105,32 +103,74 @@ _.extend(MemoryStore.prototype, {
 
 function MemoryFactory() {
 
+  this.getOrCreateUserId = async function(chatId, transport, defaultUserId) {
+    // try to find a userId given then chatId / transport for the current chatbot
+    if (isEmpty(chatId)) {
+      return null;
+    }
+
+    if (_storeChatIds[transport] != null && !_.isEmpty(_storeChatIds[transport][chatId])) {
+      return _storeUserIds[transport][chatId];
+    } else {
+      const userId = !_.isEmpty(defaultUserId) ? defaultUserId : chatId;
+      _storeUserIds[chatId] = _storeUserIds[chatId] != null ? _storeUserIds[chatId] : {};
+      _storeUserIds[chatId][transport] = userId;
+      _storeChatIds[userId] = _storeChatIds[userId] != null ? _storeChatIds[userId] : {};
+      _storeChatIds[userId][transport] = chatId;
+      return userId;
+    }
+  };
+
+  this.getUserId = async function(chatId, transport) {
+    return _storeUserIds[chatId] != null && !_.isEmpty(_storeUserIds[chatId][transport]) ?
+      _storeUserIds[chatId][transport] : chatId;
+  };
+
+  this.getChatId = async function(userId, transport) {
+    return _storeChatIds[userId] != null && !_.isEmpty(_storeChatIds[userId][transport]) ?
+      _storeChatIds[userId][transport] : null;
+  };
+
+  this.getOrCreateContext = async function(userId, statics) {
+    if (isEmpty(userId)) {
+      return null;
+    }
+    return new MemoryStore(userId, { ...statics });
+  };
+
+  this.mergeUserId = async function(fromUserId, toUserId) {
+    const destination = _storeChatIds[toUserId];
+    const source = _storeChatIds[fromUserId];
+
+    Object.keys(source)
+      .forEach(transport => {
+        const chatId = source[transport];
+        // copy chatId/transport to destination if doesn't exist
+        if (destination[transport] == null) {
+          destination[transport] = chatId;
+        }
+        // replace chatId reference
+        _storeUserIds[chatId][transport] = toUserId;
+      });
+
+    delete _storeChatIds[fromUserId];
+  };
+  this.getContext = function(userId, statics) {
+    return new MemoryStore(userId, { ...statics });
+  };
+
   this.getOrCreate = function(chatId, userId, statics) {
+    console.log('getOrCreate() is deprecated, use getOrCreateContext() instead');
     if (isEmpty(chatId) && isEmpty(userId)) {
       return null;
     }
     // just create an class that just wraps chatId and userId, add static value (cline)
-    const store = new MemoryStore(chatId, userId, { ...statics });
+    const store = new MemoryStore(userId, { ...statics });
     return store;
-    /*const chatContext = this.get(chatId, userId);
-    if (chatContext == null) {
-      const memoryStore = new MemoryStore({ ...defaults });
-      _store[chatId] = memoryStore;
-      if (!isEmpty(userId)) {
-        _storeUserIds[userId] = memoryStore;
-      }
-      return _store[chatId];
-    }
-    return chatContext;
-    */
   };
+
   this.get = function(chatId, userId, statics) {
-    /*if (!isEmpty(chatId) && _store[chatId] != null) {
-      return _store[chatId];
-    } else if (!isEmpty(userId) && _storeUserIds[userId] != null) {
-      return _storeUserIds[userId];
-    }
-    return null;*/
+    console.log('get() is deprecated');
     return new MemoryStore(chatId, userId, { ...statics });
   };
 
@@ -145,13 +185,13 @@ _.extend(MemoryFactory.prototype, {
   getOrCreate: function(/*chatId, userId, statics*/) {
   },
   assignToUser(userId, context) {
-    // when merging a user into another, this trasnfer the current context to another user
-    // TODO perhaps remove other occurence
+    console.log('assignToUser() is deprecated')
     _storeUserIds[userId] = context;
   },
   reset() {
     Object.keys(_store).forEach(key => delete _store[key]);
     Object.keys(_storeUserIds).forEach(key => delete _storeUserIds[key]);
+    Object.keys(_storeChatIds).forEach(key => delete _storeUserIds[key]);
     return this;
   },
   stop: function() {

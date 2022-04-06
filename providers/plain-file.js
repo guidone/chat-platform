@@ -2,12 +2,11 @@ const _ = require('underscore');
 const fs = require('fs');
 const moment = require('moment');
 const crypto = require('crypto');
+
 const lcd = require('../helpers/lcd');
 const FileQueue = require('../helpers/promises-queue');
 const filesQueue = {};
 
-// memory cache, each loaded store is here and it's saved to filesystem at every changes,
-// subsequent read hit the cache
 let _store = {};
 // main index
 let _index;
@@ -27,7 +26,6 @@ const parse = content => {
 
   return obj;
 };
-
 
 const deleteFile = file => {
   return new Promise((resolve, reject) => {
@@ -130,6 +128,37 @@ function FileFactory(params) {
   if (!fs.existsSync(params.path)) {
     throw 'Plain file context provider: "path" (' + params.path + ') doesn\'t exist';
   }
+
+  this.getOrCreateUserId = async function(chatId, transport) {
+    return chatId;
+  };
+
+  this.getUserId = async function(chatId, transport) {
+    // plain file is actually not implemented for multi-transport, alwats use sqlite
+    return chatId;
+  };
+
+  this.getChatId = async function(userId, transport) {
+    return userId;
+  };
+
+  this.getOrCreateContext = async function(userId, statics) {
+    const { path } = params;
+    // chatId is always userId
+    return new FileStore(userId, userId, { ...statics }, { path });
+  };
+
+  this.mergeUserId = async function(fromUserId, toUserId) {
+    // not implemented
+  };
+
+  this.getContext = function(userId, statics) {
+    const { path } = params;
+    // chatId is always userId
+    return new FileStore(userId, userId, { ...statics }, { path });
+  };
+
+  // below here deprecated
 
   this.getOrCreate = function(chatId, userId = null, statics = {}) {
     const { path } = params;

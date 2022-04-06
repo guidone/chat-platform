@@ -57,8 +57,8 @@ function SQLiteFactory(params) {
     chatbotId: { type: Sequelize.STRING }
   }, {
     indexes: [
-      { name: 'chatid_userid', using: 'BTREE', fields: ['userId'] },
-      { name: 'chatid_chatbotId', using: 'BTREE', fields: ['chatbotId'] }
+      { name: 'context_userid', using: 'BTREE', fields: ['userId'] },
+      { name: 'context_chatbotId', using: 'BTREE', fields: ['chatbotId'] }
     ]
   });
 
@@ -176,11 +176,12 @@ function SQLiteFactory(params) {
       return this;
     }
   });
+
   // **
   // End definition if SQLite store
   // **
 
-  this.getOrCreateUserId = async function(chatId, transport) {
+  this.getOrCreateUserId = async function(chatId, transport, defaultUserId) {
     // try to find a userId given then chatId / transport for the current chatbot
     const binding = await ChatId.findOne({
       where: { chatId, transport, chatbotId: this.chatbotId }
@@ -189,7 +190,7 @@ function SQLiteFactory(params) {
     if (binding != null) {
       return binding.userId;
     } else {
-      const userId = chatId;
+      const userId = !_.isEmpty(defaultUserId) ? defaultUserId : chatId;
       await ChatId.create({ chatId, transport, chatbotId: this.chatbotId, userId });
       return userId;
     }
@@ -222,6 +223,20 @@ function SQLiteFactory(params) {
     return store;
   };
 
+  this.mergeUserId = async function(fromUserId, toUserId) {
+    const fromChatIds = await ChatId.findAll({ where: { userId: fromUserId, chatbotId: this.chatbotId }});
+    const toChatIds = await ChatId.findAll({ where: { userId: toUserId, chatbotId: this.chatbotId }});
+
+    // turn only chatIds that don't already exists
+    for (const item of fromChatIds) {
+      const hasTransport = toChatIds.filter(({ transport }) => transport === item.transport).length !== 0;
+      if (!hasTransport) {
+        await ChatId.update({ userId: toUserId }, { where: { id: item.id }});
+      }
+    }
+  };
+
+  // deprecated below
 
   this.getOrCreate = async function(chatId, userId, statics) {
     if (isEmpty(chatId) && isEmpty(userId)) {
@@ -268,6 +283,7 @@ function SQLiteFactory(params) {
     try {
       if (createTable) {
         await Context.sync();
+        await ChatId.sync();
       }
       // then log, don't move, keep the log lines together
       console.log(lcd.timestamp() + 'SQLite context provider configuration:');
