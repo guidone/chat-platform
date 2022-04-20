@@ -73,15 +73,15 @@ const ChatExpress = function(options) {
   // configuration warnings
   if (_.isEmpty(this.options.chatIdKey) && !_.isFunction(this.options.chatIdKey)) {
     // eslint-disable-next-line no-console
-    console.log(yellow('WARNING: chatIdKey option is empty'));
+    console.log(lcd.timestamp() + yellow('WARNING: chatIdKey option is empty'));
   }
   if (_.isEmpty(this.options.userIdKey) && !_.isFunction(this.options.userIdKey)) {
     // eslint-disable-next-line no-console
-    console.log(yellow('WARNING: userIdKey option is empty'));
+    console.log(lcd.timestamp() + yellow('WARNING: userIdKey option is empty'));
   }
   if (_.isEmpty(this.options.transport)) {
     // eslint-disable-next-line no-console
-    console.log(yellow('WARNING: transport option is empty'));
+    console.log(lcd.timestamp() + yellow('WARNING: transport option is empty'));
   }
 
   function evaluateParam(payload, newKey, optionKey, chatServer) {
@@ -154,11 +154,11 @@ const ChatExpress = function(options) {
     // check if message is null, perhaps someone forgot to resolve a promise
     if (message == null) {
       // eslint-disable-next-line no-console
-      console.log(yellow('WARNING: a middleware is returning an empty message'));
+      console.log(lcd.timestamp() + yellow('WARNING: a middleware is returning an empty message'));
     }
     if (message.payload == null) {
       // eslint-disable-next-line no-console
-      console.log(yellow('WARNING: a middleware is returning an empty payload in message'));
+      console.log(lcd.timestamp() + yellow('WARNING: a middleware is returning an empty payload in message'));
     }
   }
 
@@ -333,7 +333,7 @@ const ChatExpress = function(options) {
         .then(() => when(message));
     } else {
       // eslint-disable-next-line no-console
-      console.log(yellow('WARNING: context provider was not specified'));
+      console.log(lcd.timestamp() + yellow('WARNING: context provider was not specified'));
     }
     // run general middleware
     _(_this.uses.concat(chatServer.getUseMiddleWares())).each(function(filter) {
@@ -604,9 +604,9 @@ const ChatExpress = function(options) {
       const uiPort = RED.settings.get('uiPort');
       const options = chatServer.getOptions();
       // eslint-disable-next-line no-console
-      console.log('');
+      console.log(lcd.timestamp() + '');
       // eslint-disable-next-line no-console
-      console.log(grey('------ WebHooks for ' + options.transport.toUpperCase() + '----------------'));
+      console.log(lcd.timestamp() + grey('------ WebHooks for ' + options.transport.toUpperCase() + '----------------'));
       _(routes).map((middleware, route) => {
         const host = 'http://localhost' + (uiPort != '80' ? ':' + uiPort : '');
         const callback = generateCallback(route, chatServer);
@@ -618,14 +618,14 @@ const ChatExpress = function(options) {
           description = routesDescription[route].call(chatServer);
         }
         // eslint-disable-next-line no-console
-        console.log(green(host + callback) + (description != null ? grey(' - ') + white(description) : ''));
+        console.log(lcd.timestamp() + green(host + callback) + (description != null ? grey(' - ') + white(description) : ''));
         // attach to Express instance
         const escaped = String(`^${callback}$`).replace(RegExp('/', 'g'), '\\/');
         RED.httpNode.use(new RegExp(escaped), middleware.bind(chatServer));
         return null;
       });
       // eslint-disable-next-line no-console
-      console.log('');
+      console.log(lcd.timestamp() + '');
     }
     return when(true);
   }
@@ -976,7 +976,7 @@ const ChatExpress = function(options) {
             .then(function() {
               if (_this.isDebug()) {
                 // eslint-disable-next-line no-console
-                console.log(green('Chat server started, transport: ') + white(options.transport));
+                console.log(green(lcd.timestamp() + 'Chat server started, transport: ') + white(options.transport));
               }
               // listen to inbound event
               var connector = options.connector;
@@ -1025,7 +1025,7 @@ const ChatExpress = function(options) {
           } catch(e) {
             // todo better error displaying
             // eslint-disable-next-line no-console
-            console.log('Error in resolver chatId<->userId', e);
+            console.log(lcd.timestamp() + 'Error in resolver chatId<->userId', e);
             throw new Error('Error in resolver chatId<->userId', e);
           }
         };
@@ -1041,7 +1041,7 @@ const ChatExpress = function(options) {
           } catch(e) {
             // todo better error displaying
             // eslint-disable-next-line no-console
-            console.log('Error in resolver chatId<->preferred transport', e);
+            console.log(lcd.timestamp() + 'Error in resolver chatId<->preferred transport', e);
             throw new Error('Error in resolver chatId<->preferred transport', e);
           }
         };
