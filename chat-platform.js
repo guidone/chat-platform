@@ -191,9 +191,13 @@ const ChatExpress = function(options) {
       }
     }
     if (_.isEmpty(chatId) && !_.isEmpty(userId)) {
-      chatId = await contextProvider.getChatId(userId, options.transport);
-      if (_.isEmpty(chatId)) {
-        throw `Unable to resolve chatId from userId "${userId}" (${options.transport}). That means either the userId "${userId}" doesn't exist or it's not possible to find a valid chatId for the platform ${options.transport}.`;
+      if (userId === 'simulator') {
+        chatId = 0; // for simulators conventionally set zero
+      } else {
+        chatId = await contextProvider.getChatId(userId, options.transport);
+        if (_.isEmpty(chatId)) {
+          throw `Unable to resolve chatId from userId "${userId}" (${options.transport}). That means either the userId "${userId}" doesn't exist or it's not possible to find a valid chatId for the platform ${options.transport}.`;
+        }
       }
     }
 
