@@ -137,6 +137,14 @@ function MemoryFactory() {
     }
     return new MemoryStore(userId, { ...statics });
   };
+  // this is only to be used in testing to simplify the testing scenarios
+  // there's no really need for an async func here
+  this.getOrCreateContextSync = function(userId, statics) {
+    if (isEmpty(userId)) {
+      return null;
+    }
+    return new MemoryStore(userId, { ...statics });
+  };
 
   this.mergeUserId = async function(fromUserId, toUserId) {
     const destination = _storeChatIds[toUserId];
