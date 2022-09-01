@@ -747,7 +747,8 @@ const ChatExpress = function(options) {
         label: !_.isEmpty(config.label) ? config.label : name,
         description: config.description,
         default: config.default,
-        options: config.options
+        options: config.options,
+        suggestions: config.suggestions
       });
       return this;
     },
@@ -1253,7 +1254,8 @@ ChatExpress.registerParam = function(name, type, config = {}) {
     label: !_.isEmpty(config.label) ? config.label : name,
     description: config.description,
     default: config.default,
-    options: config.options
+    options: config.options,
+    suggestions: config.suggestions
   });
   return this;
 };
