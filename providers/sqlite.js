@@ -31,7 +31,7 @@ function SQLiteFactory(params) {
     throw 'SQLite context provider: missing parameter "dbPath"';
   }
   if (_.isEmpty(params.chatbotId)) {
-    throw 'SQLite context provider: missing parameter "chatbotId"';
+    throw 'SQLite context provider: missing parameter "chatbotId", if using the SQLite context store standalone, just add a key "chatbotId": "my-bot" in the params of the context store.';
   }
   if (!fs.existsSync(params.dbPath)) {
     //throw 'SQLite context provider: "dbPath" (' + params.path + ') doesn\'t exist';
@@ -273,14 +273,14 @@ function SQLiteFactory(params) {
       DROP INDEX "chatid_userid";
       DROP INDEX "chatid_chatid";
     */
-    // if table doesn't exists, then create
-    const tableExists = await sequelize.query(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='contexts';",
-      { type: QueryTypes.SELECT }
-    );
-    const createTable = tableExists.length === 0;
     // create the table
     try {
+      // if table doesn't exists, then create
+      const tableExists = await sequelize.query(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='contexts';",
+        { type: QueryTypes.SELECT }
+      );
+      const createTable = tableExists.length === 0;
       if (createTable) {
         await Context.sync();
         await ChatId.sync();
@@ -296,7 +296,6 @@ function SQLiteFactory(params) {
       }
     } catch(e) {
       lcd.dump(e, 'Something went wrong creating the SQLite "contexts" table');
-      throw e;
     }
 
     return true;
@@ -310,6 +309,7 @@ _.extend(SQLiteFactory.prototype, {
     + ' JSON config like this <pre style="margin-top: 10px;">\n'
     + '{\n'
     + '"dbPath": "/my-path/my-database.sqlite"\n'
+    + '"chatbotId": "my-bot"\n'
     + '}</pre>'
     + '<br/> The table <em>context</em> will be automatically created.',
   get: function(/*chatId, userId*/) {
