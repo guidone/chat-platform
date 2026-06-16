@@ -1,4 +1,3 @@
-const moment = require('moment');
 const assert = require('chai').assert;
 const RED = require('../lib/red-stub')();
 const ChatExpress = require('../chat-platform');
@@ -79,7 +78,7 @@ describe('Chat platform framework', () => {
       chatIdKey: payload => payload.myChatIdKey,
       userIdKey: payload => payload.myUserIdKey,
       type: payload => payload.type,
-      tsKey: () => moment(),
+      tsKey: () => new Date(),
       transport: 'generic',
       inboundMessageEvent: 'message',
       connector: connector,
@@ -103,7 +102,8 @@ describe('Chat platform framework', () => {
     assert.equal(message.payload.userId, '62');
     assert.equal(message.payload.inbound, true);
     assert.equal(message.payload.transport, 'generic');
-    assert.equal(message.payload.ts.isValid(), true);
+    assert.instanceOf(message.payload.ts, Date);
+    assert.isFalse(isNaN(message.payload.ts.getTime()));
     assert.isFunction(message.chat);
     const variables = message.chat().all();
     assert.equal(variables.pending, false);

@@ -1,4 +1,4 @@
-const _ = require('underscore');
+const _ = require('lodash');
 const assert = require('chai').assert;
 const fs = require('fs');
 const os = require('os');

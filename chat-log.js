@@ -1,5 +1,4 @@
-var _ = require('underscore');
-var moment = require('moment');
+var _ = require('lodash');
 var fs = require('fs');
 var lcd = require('./helpers/lcd');
 
@@ -103,7 +102,7 @@ module.exports = function(variables) {
             + (!_.isEmpty(name) ? '[' + name.join(' ') + '] ' : '')
             + (inbound ? '> ' : '< ')
             + (transport != null ? '[' + transport.toUpperCase() + '] ' : '')
-            + moment().toString() + ' - ' + stringifiedMessage;
+            + new Date().toString() + ' - ' + stringifiedMessage;
         }
       }
 

@@ -1,4 +1,3 @@
-const moment = require('moment');
 const chai = require('chai');
 const assert = chai.assert;
 const expect = chai.expect;
@@ -114,7 +113,7 @@ describe('Universal Connector', () => {
       assert.equal(variables.payload, 'Bazinga');
       assert.equal(variables.authorized, false);
       assert.equal(variables.language, 'it');
-      assert.instanceOf(message.payload.ts, moment);
+      assert.instanceOf(message.payload.ts, Date);
       done();
     });
     chatServer.receive({

@@ -1,6 +1,5 @@
-const _ = require('underscore');
+const _ = require('lodash');
 const fs = require('fs');
-const moment = require('moment');
 const crypto = require('crypto');
 
 const lcd = require('../helpers/lcd');
@@ -20,7 +19,7 @@ const parse = content => {
   // go through every key/value to search for a date-like string
   _(obj).each(function(value, key) {
     if (_.isString(value) && value.match(date)) {
-      obj[key] = moment(value);
+      obj[key] = new Date(value);
     }
   });
 
@@ -241,7 +240,7 @@ _.extend(FileStore.prototype, {
       // go through every key/value to search for a date-like string
       _(obj).each((value, key) => {
         if (_.isString(value) && value.match(date)) {
-          obj[key] = moment(value);
+          obj[key] = new Date(value);
         }
       });
     } catch(e) {

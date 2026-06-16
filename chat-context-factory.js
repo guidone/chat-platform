@@ -1,4 +1,4 @@
-const _ = require('underscore');
+const _ = require('lodash');
 
 const contextProviders = {};
 contextProviders.memory = require('./providers/memory');
@@ -59,7 +59,7 @@ const ContextProviders = function(RED) {
     },
 
     hasProvider(provider) {
-      return _(methods.getProviders()).contains(provider);
+      return _.includes(methods.getProviders(), provider);
     },
 
     getProvider(providerName, params = {}) {

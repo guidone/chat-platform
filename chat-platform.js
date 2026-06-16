@@ -1,5 +1,4 @@
-const _ = require('underscore');
-const _s = require('underscore.string');
+const _ = require('lodash');
 const clc = require('cli-color');
 const prettyjson = require('prettyjson');
 const { when } = require('./lib/utils');
@@ -7,7 +6,6 @@ const EventEmitter = require('events').EventEmitter;
 const inherits = require('util').inherits;
 const lcd = require('./helpers/lcd');
 const Table = require('cli-table');
-const request = require('request').defaults({ encoding: null });
 
 const identity = function(obj) { return obj; };
 const green = clc.greenBright;
@@ -541,11 +539,13 @@ const ChatExpress = function(options) {
     var options = chatServer.getOptions();
     var connector = options.connector;
     if (connector != null) {
-      if (options.inboundMessageEvent != null) {
+      if (_.isFunction(options.inboundMessageEvent)) {
         connector.off(options.inboundMessageEvent);
       }
       _(events).each(function (callback, eventName) {
-        connector.off(eventName);
+        if (_.isFunction(eventName)) {
+          connector.off(eventName);
+        }
       });
     }
   }
@@ -562,7 +562,7 @@ const ChatExpress = function(options) {
 
   function unmountRoutes(RED, routes, chatServer) {
     if (routes != null) {
-      const endpoints = _(routes).keys();
+      const endpoints = _.keys(routes);
       if (!_.isEmpty(endpoints)) {
         let routesCount = RED.httpNode._router.stack.length;
         let idx = 0;
@@ -571,7 +571,7 @@ const ChatExpress = function(options) {
           const route = stack[idx];
           if (route != null && route.name != null) {
             const routeName = String(route.name).replace('bound ', '');
-            if (_.contains(endpoints, routeName)) {
+            if (_.includes(endpoints, routeName)) {
               stack.splice(idx, 1);
             } else {
               idx += 1;
@@ -611,7 +611,7 @@ const ChatExpress = function(options) {
       console.log(lcd.timestamp() + '');
       // eslint-disable-next-line no-console
       console.log(lcd.timestamp() + grey('------ WebHooks for ' + options.transport.toUpperCase() + '----------------'));
-      _(routes).map((middleware, route) => {
+      _.each(routes, (middleware, route) => {
         const host = 'http://localhost' + (uiPort != '80' ? ':' + uiPort : '');
         const callback = generateCallback(route, chatServer);
         // make description
@@ -687,8 +687,8 @@ const ChatExpress = function(options) {
       if (type == null || typeof type !== 'string') {
         throw 'Missing type in .registerMessageType()';
       }
-      name = name != null ? name : _s.capitalize(type);
-      let typeDescriptor = _(_messageTypes).findWhere({ type: type });
+      name = name != null ? name : _.upperFirst(type);
+      let typeDescriptor = _.find(_messageTypes, { type: type });
       if (typeDescriptor == null) {
         typeDescriptor = { type: type };
         _messageTypes.push(typeDescriptor);
@@ -715,7 +715,7 @@ const ChatExpress = function(options) {
       if (name == null || typeof name !== 'string') {
         throw 'Missing name in .registerEvent()';
       }
-      var eventDescriptor = _(_events).findWhere({ name: name });
+      var eventDescriptor = _.find(_events, { name: name });
       if (eventDescriptor == null) {
         eventDescriptor = { name: name };
         _events.push(eventDescriptor);
@@ -787,15 +787,48 @@ const ChatExpress = function(options) {
           console.log(prettyjson.render(obj));
         };
         this.request = function(options = {}) {
-          return new Promise(function(resolve, reject) {
-            request(options, function(error, response, body) {
-              if (error) {
-                reject(`Error calling URL ${options.url}`);
-              } else {
-                resolve(body);
-              }
+          var url = options.url || options.uri;
+          // Translate "request"-style options into a "fetch" call
+          if (options.qs != null) {
+            var qs = new URLSearchParams(options.qs).toString();
+            if (qs) {
+              url += (url.indexOf('?') === -1 ? '?' : '&') + qs;
+            }
+          }
+          var headers = _.extend({}, options.headers);
+          var body;
+          if (options.json != null && options.json !== true && options.json !== false) {
+            body = JSON.stringify(options.json);
+            if (headers['content-type'] == null && headers['Content-Type'] == null) {
+              headers['Content-Type'] = 'application/json';
+            }
+          } else if (options.json === true && options.body != null) {
+            body = JSON.stringify(options.body);
+            if (headers['content-type'] == null && headers['Content-Type'] == null) {
+              headers['Content-Type'] = 'application/json';
+            }
+          } else if (options.form != null) {
+            body = new URLSearchParams(options.form).toString();
+            if (headers['content-type'] == null && headers['Content-Type'] == null) {
+              headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
+          } else if (options.body != null) {
+            body = options.body;
+          }
+          return fetch(url, {
+            method: options.method || 'GET',
+            headers: headers,
+            body: body
+          })
+            .then(function(response) {
+              // Preserve the previous behaviour ({ encoding: null }) of resolving with a Buffer
+              return response.arrayBuffer().then(function(buffer) {
+                return Buffer.from(buffer);
+              });
+            })
+            .catch(function() {
+              return Promise.reject(`Error calling URL ${url}`);
             });
-          });
         };
         this.getOptions = function() {
           return this.options;
@@ -815,7 +848,7 @@ const ChatExpress = function(options) {
             return outboundMessage(message, this);
           } else {
             var task = when(true);
-            _(message.payload).each(function(payload) {
+            _.each(message.payload, function(payload) {
               task = task.then(function() {
                 return outboundMessage(_.extend({}, message, { payload: payload }), _this);
               });
@@ -861,8 +894,8 @@ const ChatExpress = function(options) {
           if (type == null || typeof type !== 'string') {
             throw 'Missing type in .registerMessageType()';
           }
-          name = name != null ? name : _s.capitalize(type);
-          let typeDescriptor = _(_messageTypes).findWhere({ type: type });
+          name = name != null ? name : _.upperFirst(type);
+          let typeDescriptor = _.find(_messageTypes, { type: type });
           if (typeDescriptor == null) {
             typeDescriptor = { type: type };
             _messageTypes.push(typeDescriptor);
@@ -889,7 +922,7 @@ const ChatExpress = function(options) {
           if (name == null || typeof name !== 'string') {
             throw 'Missing name in .registerEvent()';
           }
-          var eventDescriptor = _(_events).findWhere({ name: name });
+          var eventDescriptor = _.find(_events, { name: name });
           if (eventDescriptor == null) {
             eventDescriptor = { name: name };
             _events.push(eventDescriptor);
@@ -1086,20 +1119,20 @@ const ChatExpress = function(options) {
   Static methods for ChatExpress
  */
 ChatExpress.getMessageTypes = function() {
-  return _(_messageTypes).map(function(item) {
+  return _.map(_messageTypes, function(item) {
     return {
       value: item.type,
       label: item.name,
-      platforms: _(item.platforms).keys()
+      platforms: _.keys(item.platforms)
     };
   });
 };
 ChatExpress.getEvents = function() {
-  return _(_events).map(function(item) {
+  return _.map(_events, function(item) {
     return {
       value: item.name,
       label: item.description,
-      platforms: _(item.platforms).keys()
+      platforms: _.keys(item.platforms)
     };
   });
 };
@@ -1110,19 +1143,18 @@ ChatExpress.getParams = function() {
 function compatibilityTable(items, options) {
   options = _.extend({ column: 'Column' }, options);
   // collect platforms except universal
-  var platforms = _(ChatExpress.getPlatforms()).chain()
-    .map(function(platform) {
+  var platforms = _.reject(
+    _.map(ChatExpress.getPlatforms(), function(platform) {
       return platform.id;
-    })
-    .reject(function(id) {
+    }),
+    function(id) {
       return id === 'universal';
-    })
-    .sort()
-    .value();
+    }
+  ).sort();
   // build header
   var head = [options.column];
-  _(platforms).each(function(name) {
-    head.push(_s.capitalize(name));
+  _.each(platforms, function(name) {
+    head.push(_.upperFirst(name));
   });
   var colAligns = ['left'];
   _.times(platforms.length, function() {
@@ -1137,21 +1169,19 @@ function compatibilityTable(items, options) {
     }
   });
   // message types columns
-  _(items).chain()
-    .sortBy(function(type) {
-      return type.name;
-    })
-    .each(function(type) {
-      var row = [type.name];
-      _(platforms).each(function(platform) {
-        if (type.platforms[platform]) {
-          row.push('✔');
-        } else {
-          row.push('');
-        }
-      });
-      table.push(row);
+  _.each(_.sortBy(items, function(type) {
+    return type.name;
+  }), function(type) {
+    var row = [type.name];
+    _.each(platforms, function(platform) {
+      if (type.platforms[platform]) {
+        row.push('✔');
+      } else {
+        row.push('');
+      }
     });
+    table.push(row);
+  });
   // eslint-disable-next-line no-console
   console.log(table.toString());
 
@@ -1172,21 +1202,21 @@ ChatExpress.showCompatibilityChart = function() {
  * @return {Array}
  */
 ChatExpress.getPlatforms = function() {
-  var platforms = _(_platforms).keys();
+  var platforms = _.keys(_platforms);
 
-  return _(platforms).chain()
-    .map(function(platform) {
+  return _.sortBy(
+    _.map(platforms, function(platform) {
       return {
         id: _platforms[platform].id,
         name: _platforms[platform].name,
         universal: _platforms[platform].universal,
         color: _platforms[platform].color
       };
-    })
-    .sortBy(function(platform) {
+    }),
+    function(platform) {
       return platform.name != null ? platform.name : platform.id;
-    })
-    .value();
+    }
+  );
 };
 
 /**
@@ -1199,9 +1229,9 @@ ChatExpress.getPlatforms = function() {
 ChatExpress.isSupported = function(platform, type) {
   if (type == null) {
     const platforms = ChatExpress.getPlatforms();
-    return _(platforms).findWhere({ id: platform }) != null;
+    return _.find(platforms, { id: platform }) != null;
   } else {
-    const messageType = _(_messageTypes).findWhere({ type: type });
+    const messageType = _.find(_messageTypes, { type: type });
     return messageType != null && messageType.platforms[platform];
   }
 };
@@ -1219,7 +1249,7 @@ ChatExpress.isSupported = function(platform, type) {
  * @return {String} Null if no errors
  */
 ChatExpress.isValidFile = function(platform, type, file) {
-  const messageType = _(_messageTypes).findWhere({ type: type });
+  const messageType = _.find(_messageTypes, { type: type });
   if (messageType != null) {
     const validator = messageType.validators[platform];
     if (validator != null) {

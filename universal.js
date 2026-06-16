@@ -1,8 +1,7 @@
-const moment = require('moment');
 const ChatExpress = require('./chat-platform');
 const utils = require('./lib/utils');
 const when = utils.when;
-const _ = require('underscore');
+const _ = require('lodash');
 
 const Universal = new ChatExpress({
   transport: 'universal',
@@ -14,7 +13,7 @@ const Universal = new ChatExpress({
     return payload.userId;
   },
   tsKey() {
-    return moment();
+    return new Date();
   },
   language() {
     return null;
