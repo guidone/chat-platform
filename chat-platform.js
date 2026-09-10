@@ -1,4 +1,5 @@
 const _ = require('lodash');
+const ws = require('ws');
 const clc = require('cli-color');
 const prettyjson = require('prettyjson');
 const { when } = require('./lib/utils');
@@ -23,11 +24,20 @@ if (global['redbot-chat-platform'] == null) {
     params: {}
   };
 }
+// WebSocket endpoints are mounted on the raw http server, which is shared by every chatbot of the
+// instance: the registry has to live in the global space like the others, and it has to survive
+// ChatExpress.reset() since the "upgrade" listener attached to the server is never removed
+if (global['redbot-chat-platform'].wsRoutes == null) {
+  global['redbot-chat-platform'].wsRoutes = {};
+  global['redbot-chat-platform'].wsServers = new WeakSet();
+}
 
 let _messageTypes = global['redbot-chat-platform'].messageTypes;
 let _events = global['redbot-chat-platform'].events;
 let _platforms = global['redbot-chat-platform'].platforms;
 let _params = global['redbot-chat-platform'].params;
+let _wsRoutes = global['redbot-chat-platform'].wsRoutes;
+let _wsServers = global['redbot-chat-platform'].wsServers;
 let _globalCallbacks = {};
 
 const ChatExpress = function(options) {
@@ -50,6 +60,9 @@ const ChatExpress = function(options) {
     RED: null,
     routes: null,
     routesDescription: null,
+    wsRoutes: null,
+    wsRoutesDescription: null,
+    wsVerifyClient: null,
     events: null,
     relaxChatId: false,
     bundle: false,
@@ -634,6 +647,145 @@ const ChatExpress = function(options) {
     return when(true);
   }
 
+  /**
+   * @method wsPathname
+   * The pathname an upgrade request was sent to, without the query string
+   * @param {string} url
+   * @return {string}
+   */
+  function wsPathname(url) {
+    const pathname = String(url != null ? url : '').split('?')[0];
+    // a trailing slash is the same endpoint: "/redbot/my-bot/ws/" === "/redbot/my-bot/ws"
+    return pathname.length > 1 && pathname.slice(-1) === '/' ? pathname.slice(0, -1) : pathname;
+  }
+
+  /**
+   * @method wsFullPath
+   * Absolute path of a WebSocket endpoint. Like the Express ones, the paths declared by a platform are
+   * relative to `httpNodeRoot`, but an upgrade request never enters the Express router so the prefix
+   * has to be applied by hand
+   * @param {object} RED
+   * @param {string} route
+   * @return {string}
+   */
+  function wsFullPath(RED, route) {
+    const root = RED.settings != null && !_.isEmpty(RED.settings.httpNodeRoot) ?
+      RED.settings.httpNodeRoot : '/';
+    const prefix = root.slice(-1) === '/' ? root.slice(0, -1) : root;
+    return `${prefix}${route.charAt(0) === '/' ? route : `/${route}`}`;
+  }
+
+  /**
+   * @method dispatchUpgrade
+   * The one and only "upgrade" listener of the process: hand the request over to the WebSocket endpoint
+   * registered on that path, if any.
+   * Node-RED attaches its own listeners to the same server (the editor "comms" channel and the core
+   * WebSocket nodes) and, exactly like them, a request that matches nothing here is left alone instead
+   * of being destroyed, so that the other listeners can still handle it
+   */
+  function dispatchUpgrade(request, socket, head) {
+    const entry = _wsRoutes[wsPathname(request.url)];
+    if (entry == null) {
+      // not one of ours: don't destroy the socket, another listener may want to handle it
+      return;
+    }
+    entry.wss.handleUpgrade(request, socket, head, function done(connection) {
+      entry.wss.emit('connection', connection, request);
+    });
+  }
+
+  /**
+   * @method mountUpgradeListener
+   * Attach the dispatcher to the http server, once per server: a Node-RED deploy re-creates every
+   * configuration node, so a listener per chatbot would pile up at every deploy
+   * @param {object} server
+   */
+  function mountUpgradeListener(server) {
+    if (_wsServers.has(server)) {
+      return;
+    }
+    server.on('upgrade', dispatchUpgrade);
+    _wsServers.add(server);
+  }
+
+  /**
+   * @method mountWsRoutes
+   * Mount the WebSocket endpoints of a chat server. Unlike the Express routes these are matched exactly,
+   * so `wsRoutes` can also be a function (bound to the chat server) returning the routes, for a platform
+   * that needs to build the path out of its own configuration (i.e. a bot id in the middle of the path)
+   * @param {object} RED
+   * @param {object|function} wsRoutes
+   * @param {object} wsRoutesDescription
+   * @param {object} chatServer
+   */
+  // eslint-disable-next-line max-params
+  function mountWsRoutes(RED, wsRoutes, wsRoutesDescription, chatServer) {
+    const routes = _.isFunction(wsRoutes) ? wsRoutes.call(chatServer) : wsRoutes;
+    if (routes == null || _.isEmpty(routes)) {
+      return when(true);
+    }
+    // the descriptions are keyed by route: when the routes are generated, so are their descriptions
+    const descriptions = _.isFunction(wsRoutesDescription) ?
+      wsRoutesDescription.call(chatServer) : wsRoutesDescription;
+    if (RED == null || RED.server == null) {
+      chatServer.warn('Impossible to mount the WebSocket endpoints: ' +
+        (RED == null ? '"RED" param is empty' : '"RED.server" is not available'));
+      return when(true);
+    }
+    const options = chatServer.getOptions();
+    const uiPort = RED.settings.get('uiPort');
+    mountUpgradeListener(RED.server);
+    // eslint-disable-next-line no-console
+    console.log(lcd.timestamp() + '');
+    // eslint-disable-next-line no-console
+    console.log(lcd.timestamp() + grey('------ WebSockets for ' + options.transport.toUpperCase() + '--------------'));
+    _.each(routes, (handler, route) => {
+      const host = 'ws://localhost' + (uiPort != '80' ? ':' + uiPort : '');
+      const path = wsFullPath(RED, generateCallback(route, chatServer));
+      if (_wsRoutes[path] != null) {
+        chatServer.error(`The WebSocket endpoint ${path} is already mounted by another chatbot, skipped`);
+        return null;
+      }
+      let description = null;
+      if (descriptions != null && _.isString(descriptions[route])) {
+        description = descriptions[route];
+      } else if (descriptions != null && _.isFunction(descriptions[route])) {
+        description = descriptions[route].call(chatServer);
+      }
+      // eslint-disable-next-line no-console
+      console.log(lcd.timestamp() + green(host + path) + (description != null ? grey(' - ') + white(description) : ''));
+      const wss = new ws.Server(_.isFunction(options.wsVerifyClient) ?
+        { noServer: true, verifyClient: options.wsVerifyClient.bind(chatServer) } : { noServer: true });
+      wss.setMaxListeners(0);
+      wss.on('connection', handler.bind(chatServer));
+      wss.on('error', error => chatServer.error(`WebSocket endpoint ${path}: ${error.message}`));
+      _wsRoutes[path] = { wss: wss, chatServer: chatServer };
+      return null;
+    });
+    // eslint-disable-next-line no-console
+    console.log(lcd.timestamp() + '');
+    return when(true);
+  }
+
+  /**
+   * @method unmountWsRoutes
+   * Remove every WebSocket endpoint of a chat server. The dispatcher attached to the http server stays
+   * there (it's shared by the whole process and it does nothing without a matching endpoint)
+   * @param {object} chatServer
+   */
+  function unmountWsRoutes(chatServer) {
+    _.keys(_wsRoutes).forEach(path => {
+      const entry = _wsRoutes[path];
+      if (entry == null || entry.chatServer !== chatServer) {
+        return;
+      }
+      delete _wsRoutes[path];
+      // closing the server terminates the connected clients: the widgets will reconnect once the
+      // chatbot is up again, a Node-RED deploy re-creates the configuration nodes
+      entry.wss.close();
+    });
+  }
+
   var methods = {
 
     'in': function() {
@@ -1006,6 +1158,9 @@ const ChatExpress = function(options) {
               return mountRoutes(options.RED, options.routes, options.routesDescription, _this);
             })
             .then(function() {
+              return mountWsRoutes(options.RED, options.wsRoutes, options.wsRoutesDescription, _this);
+            })
+            .then(function() {
               return mountEvents(options.events, _this);
             })
             .then(function() {
@@ -1018,7 +1173,7 @@ const ChatExpress = function(options) {
               }
               // listen to inbound event
               var connector = options.connector;
-              if (connector != null && options.inboundMessageEvent != null) {
+              if (connector != null && options.inboundMessageEvent != null && _.isFunction(connector.on)) {
                 connector.on(options.inboundMessageEvent, function (message) {
                   inboundMessage(message, chatServer);
                 });
@@ -1093,6 +1248,7 @@ const ChatExpress = function(options) {
           this.emit('stop');
           var options = this.getOptions();
           unmountRoutes(options.RED, options.routes, this);
+          unmountWsRoutes(this);
           unmountEvents(options.events, this);
           var stack = when(true);
           if (_.isFunction(options.onStop)) {
